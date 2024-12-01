@@ -189,7 +189,7 @@ function move(from, to, piece){
         promote.to=0;
         valid=true;         // promotion piece from penultimate rank could defy validation, eg.. pawn pushes forward and promotes to bishop
     }
-    else {valid= validMove(from, to);}  // no promotion, run validation process
+    else {valid= validMove(from, to, piece);}  // no promotion, run validation process
 
     if(!valid){
         soundAlert('invalid');
@@ -229,21 +229,7 @@ function move(from, to, piece){
     getId('board').dataset.player= getId('board').dataset.player=== 'white'? 'black': 'white';  // change player
     setMousePointer(getId('board').dataset.player);
 
-    const check= isCheck(to);
-}
-
-// validation functions found in './logic.js'
-function validMove(from, to){
-
-    switch(pieceAt(from)){
-        case 'p':   return validPawn  (from, to);
-        case 'r':   return validRook  (from, to);
-        case 'k':   return validKing  (from, to);
-        case 'q':   return validQueen (from, to);
-        case 'b':   return validBishop(from, to);
-        case 'n':   return validKnight(from, to);
-        default:    console.log('Validate unknown piece');
-    }
+    // const check= isCheck(to);
 }
 
 function formatColour(colour){
@@ -483,39 +469,62 @@ function validKing(from, to){
     }
 }
 
-function isCheck(attacker){      // scan attack lines using King as Point of Origin
+// validation functions found in './logic.js'
+function validMove(from, to, piece){
 
-    const king= playerAt(attacker)== 'w'? 'bk': 'wk';
-    const kingAt= squareArr.indexOf(king);
-    const attackerColour= playerAt(attacker);
+    let rtnVal;
+    switch(pieceAt(from)){
+        case 'p':   rtnVal = validPawn  (from, to); break;
+        case 'r':   rtnVal = validRook  (from, to); break; 
+        case 'k':   rtnVal = validKing  (from, to); break;
+        case 'q':   rtnVal = validQueen (from, to); break;
+        case 'b':   rtnVal = validBishop(from, to); break;
+        case 'n':   rtnVal = validKnight(from, to); break;
+        default:    console.log('Validate unknown piece'); break;
+    }
 
-    if(compassCheck(attacker, king, kingAt, attackerColour)) return true;
-    if(knightCheck(king, kingAt, attackerColour)) return true;
-    if(pawnCheck(king, kingAt, attackerColour)) return true;
+    const cloneSquareArr = [...squareArr];
+    cloneSquareArr[from]= '';
+    cloneSquareArr[to]= piece;
+    let check= isInCheck(getId('board').dataset.player, cloneSquareArr);
+    return rtnVal;
+}
+
+function isInCheck(currentPlayer, cloneSquareArr){      // scan attack lines using King as Point of Origin
+
+
+    const king= currentPlayer== 'white'? 'bk': 'wk';
+    const kingAt= cloneSquareArr.indexOf(king);
+    const attackerColour= currentPlayer.charAt(0);
+
+    console.table({"defending king": king, "king position": kingAt, "current player":attackerColour});
+    if(compassCheck(kingAt, attackerColour, cloneSquareArr)) return true;
+    if(knightCheck(kingAt, attackerColour, cloneSquareArr)) return true;
+    if(pawnCheck(kingAt, attackerColour, cloneSquareArr)) return true;
     return false;
 }
 
-function compassCheck(attacker, king, kingAt, attackerColour) {     // scan attack lines for Queen, Rook and Bishop
+function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan attack lines for Queen, Rook and Bishop
     const attackLines = [
         // Array of objects containing an attacking piece, initializer, condition function, and incrementer for the nested loops below
         // first four elements dedicated to Rook and Queen lines
-        { piece: 'r', start: kingAt + 8, condition: (path) => path <= 64, increment:  8 },                      // South
-        { piece: 'r', start: kingAt - 8, condition: (path) => path >= 1,  increment: -8 },                      // North
-        { piece: 'r', start: kingAt - 1, condition: (path) => rank(path) === rank(attacker), increment: -1 },   // West
-        { piece: 'r', start: kingAt + 1, condition: (path) => rank(path) === rank(attacker), increment:  1 },   // East
+        { piece: 'r', start: square + 8, condition: (path) => path <= 64, increment:  8 },                      // South
+        { piece: 'r', start: square - 8, condition: (path) => path >= 1,  increment: -8 },                      // North
+        { piece: 'r', start: square - 1, condition: (path) => rank(path) === rank(square), increment: -1 },   // West
+        { piece: 'r', start: square + 1, condition: (path) => rank(path) === rank(square), increment:  1 },   // East
         // next four elements dedicated to Bishop and Queen lines
-        { piece: 'b', start: kingAt - 9, condition: (path) => path >= 10 && file(path) < file(kingAt), increment: -9 },   // North-West
-        { piece: 'b', start: kingAt + 9, condition: (path) => path <= 55 && file(path) > file(kingAt), increment: +9 },   // South-East
-        { piece: 'b', start: kingAt - 7, condition: (path) => path >= 9  && file(path) > file(kingAt), increment: -7 },   // North-East
-        { piece: 'b', start: kingAt + 7, condition: (path) => path <= 56 && file(path) < file(kingAt), increment: +7 },   // South-West
+        { piece: 'b', start: square - 9, condition: (path) => path >= 10 && file(path) < file(square), increment: -9 },   // North-West
+        { piece: 'b', start: square + 9, condition: (path) => path <= 55 && file(path) > file(square), increment: +9 },   // South-East
+        { piece: 'b', start: square - 7, condition: (path) => path >= 9  && file(path) > file(square), increment: -7 },   // North-East
+        { piece: 'b', start: square + 7, condition: (path) => path <= 56 && file(path) < file(square), increment: +7 },   // South-West
     ];
 
     for (let i = 0; i < attackLines.length; i++) {
         const { piece, start, condition, increment } = attackLines[i];          // annonymous object properties assigned from attackLines elements 
         for (let path = start; condition(path); path += increment) {            // annonymous object properties dictate for loop settings
-            if (squareArr[path] === '') continue;
-            if (squareArr[path] === attackerColour + piece || squareArr[path] === attackerColour + 'q') {   // is attacker present
-                console.log(`Oh Oh... ${king} is in cZech  by the ${attackerColour + pieceAt(path)}`);
+            if (cloneSquareArr[path] === '') continue;
+            if (cloneSquareArr[path] === attackerColour + piece || cloneSquareArr[path] === attackerColour + 'q') {   // is attacker present
+                console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech  by the ${attackerColour + cloneSquareArr[path].charAt(1)}`);
                 return true;
             }
             else {break;}       // non threatening piece found
@@ -524,28 +533,29 @@ function compassCheck(attacker, king, kingAt, attackerColour) {     // scan atta
     return false; // Could not find check, return false
 }
 
-function pawnCheck(king, kingAt, attackerColour){
-    if(king== 'wk'  && ( (squareArr[kingAt -7]== 'bp' && file(kingAt) != 8 )
-                    ||   (squareArr[kingAt -9]== 'bp' && file(kingAt) != 1))){    // are black pawns attacking white king from NE and NW
+function pawnCheck(square, attackerColour, cloneSquareArr){
+    const king= cloneSquareArr[square];
+    if(king== 'wk'  && ( (cloneSquareArr[square -7]== 'bp' && file(square) != 8 )
+                    ||   (cloneSquareArr[square -9]== 'bp' && file(square) != 1))){    // are black pawns attacking white king from NE and NW
         console.log(`Oh Oh... ${king} is in cZech by the ${attackerColour + 'p'}`);        
         return true;
     }
-    if(king=='bk' && ( (squareArr[kingAt +7]== 'wp' && file(kingAt) != 1)
-                  ||   (squareArr[kingAt +9]== 'wp' && file(kingAt) != 8))){     // are white pawns attacking black king from SE and SW
+    if(king=='bk' && ( (cloneSquareArr[square +7]== 'wp' && file(square) != 1)
+                  ||   (cloneSquareArr[square +9]== 'wp' && file(square) != 8))){     // are white pawns attacking black king from SE and SW
         console.log(`Oh Oh... ${king} is in cZech by the ${attackerColour + 'p'}`);
        return true;
     }
 }
 
-function knightCheck(king, kingAt, attackerColour){             // scan hops of the knight
+function knightCheck(square, attackerColour, cloneSquareArr){             // scan hops of the knight
 
     const attackLines = [6, -6, 10, -10, 15, -15, 17, -17];     // hops measure the distance between king and knight
     for(let path of attackLines){
-        const knightAt= kingAt + path;
+        const knightAt= square + path;
         if(knightAt >=1 && knightAt <=64){                      //prevent breach of border North and South
-            if(getId(kingAt).style.background != getId(knightAt).style.background){     // knight moves to opposite square colour
-                if(squareArr[knightAt]== attackerColour + 'n'){                         // attacking knight found
-                    console.log(`Oh Oh... ${king} is in cZech by the ${attackerColour + pieceAt(knightAt)}`);
+            if(getId(square).style.background != getId(knightAt).style.background){     // knight moves to opposite square colour
+                if(cloneSquareArr[knightAt]== attackerColour + 'n'){                         // attacking knight found
+                    console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the ${attackerColour + cloneSquareArr[knightAt].charAt(1)}`);
                     return true;                    
                 }
             }
