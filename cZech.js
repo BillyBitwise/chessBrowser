@@ -1,10 +1,12 @@
 /************************************************************************************************/
 /*  Author:  Jimmy Styles                                                                       */
 /*  Support: Bludoid                                                                            */
-/*  Date:    Sept 22/24 - Nov 30/24                                                                        */
+/*  Date:    Sept 22/24 - Nov 30/24                                                             */
 /*                                                                                              */
 /*  Audio:   https://pixabay.com/sound-effects/error-126627/                                    */
 /*           https://pixabay.com/sound-effects/knocking-on-the-board-158172/                    */
+/*           https://pixabay.com/sound-effects/success-fanfare-trumpets-6185/                   */
+/*                                                                                              */
 /*  Images:  https://commons.wikimedia.org/wiki/Category:PNG_chess_pieces/Standard_transparent  */
 /*                                                                                              */
 /************************************************************************************************/
@@ -29,12 +31,13 @@ function file(num)      { return num%8? num%8: 8;}
 function getId(ele)     { return document.getElementById(ele);}
 function bgColour(ele, colour)  { ele.style= (colour=="white") ?"background:white" :"background:grey";}
 
-
-let playerAt = (where) => squareArr[where].charAt(0);
-let pieceAt = (where) => squareArr[where].charAt(1);
+let currentPlayer=  () => getId('board').dataset.player.charAt(0);
+let opponent=       () => currentPlayer()== 'w'? 'b': 'w';
+let playerAt=       (where) => squareArr[where].charAt(0);
+let pieceAt=        (where) => squareArr[where].charAt(1);
 
 const moves=[];
-const columns = 8;
+const columns=  8;
 const wPassant= {'where':0, 'move':0, 'passant':false};
 const bPassant= {'where':0, 'move':0, 'passant':false};
 const promote=  {from:0,  to:0};
@@ -280,6 +283,12 @@ function soundAlert(soundType){
             validMoveSound.play();
             break;
 
+        case 'check':
+            const checkSound= new Audio('assets/sounds/check.mp3');
+            checkSound.volume= 0.3;
+            checkSound.play();
+            break;
+
         default:    break;
     }
 }
@@ -473,6 +482,7 @@ function validKing(from, to){
 function validMove(from, to, piece){
 
     let rtnVal;
+    if(pieceAt(to)=='k') {return false;}    // this can not occur once check handling is resloved
     switch(pieceAt(from)){
         case 'p':   rtnVal = validPawn  (from, to); break;
         case 'r':   rtnVal = validRook  (from, to); break; 
@@ -482,25 +492,36 @@ function validMove(from, to, piece){
         case 'n':   rtnVal = validKnight(from, to); break;
         default:    console.log('Validate unknown piece'); break;
     }
+    if(!rtnVal) return false;
 
     const cloneSquareArr = [...squareArr];
     cloneSquareArr[from]= '';
     cloneSquareArr[to]= piece;
-    let check= isInCheck(getId('board').dataset.player, cloneSquareArr);
+    const currentPlayerKing= cloneSquareArr.indexOf(currentPlayer() +'k');
+    const opponentKing = cloneSquareArr.indexOf(opponent() +'k');
+
+    let selfCheck= isInCheck(currentPlayerKing, opponent(), cloneSquareArr);
+    let check= isInCheck(opponentKing, currentPlayer(), cloneSquareArr);
+    
+    if(selfCheck){
+        console.log("You can not place your king in peril");
+        rtnVal= false;
+    }
+    else {rtnVal= true;}
+    if(check) {soundAlert('check')};
+    
     return rtnVal;
 }
 
-function isInCheck(currentPlayer, cloneSquareArr){      // scan attack lines using King as Point of Origin
+function isInCheck(square, attackerColour, cloneSquareArr){      // scan attack lines using King as Point of Origin
 
+    // console.table({ "defender content": cloneSquareArr[square],
+    //                 "defending square": square,
+    //                 "attacker colour":  attackerColour });
 
-    const king= currentPlayer== 'white'? 'bk': 'wk';
-    const kingAt= cloneSquareArr.indexOf(king);
-    const attackerColour= currentPlayer.charAt(0);
-
-    console.table({"defending king": king, "king position": kingAt, "current player":attackerColour});
-    if(compassCheck(kingAt, attackerColour, cloneSquareArr)) return true;
-    if(knightCheck(kingAt, attackerColour, cloneSquareArr)) return true;
-    if(pawnCheck(kingAt, attackerColour, cloneSquareArr)) return true;
+    if(compassCheck(square, attackerColour, cloneSquareArr)) return true;
+    if(knightCheck(square, attackerColour, cloneSquareArr)) return true;
+    if(pawnCheck(square, attackerColour, cloneSquareArr)) return true;
     return false;
 }
 
@@ -537,7 +558,7 @@ function pawnCheck(square, attackerColour, cloneSquareArr){
     const king= cloneSquareArr[square];
     if(king== 'wk'  && ( (cloneSquareArr[square -7]== 'bp' && file(square) != 8 )
                     ||   (cloneSquareArr[square -9]== 'bp' && file(square) != 1))){    // are black pawns attacking white king from NE and NW
-        console.log(`Oh Oh... ${king} is in cZech by the ${attackerColour + 'p'}`);        
+        console.log(`Oh Oh... ${king} is in cZech by the ${attackerColour + 'p'}`);
         return true;
     }
     if(king=='bk' && ( (cloneSquareArr[square +7]== 'wp' && file(square) != 1)
