@@ -48,11 +48,10 @@ const rs = getComputedStyle(r);
 
 const castle = {    // properties with numeric keys represent rook and king squares, values represent whether they have ever moved
     1: false,   57: false,
-    5: false,   61: false,
     8: false,   64: false,
 
-    isCastlePiece(square)   {return Object.hasOwn(this, square);},
-    hasPieceMoved(square)   {return this[square];},
+    isRook(square)          {return Object.hasOwn(this, square);},
+    hasRookMoved(square)    {return this[square];},
     recordMove(square)      {this[square] = true;},
 };
 
@@ -226,6 +225,28 @@ function move(from, to, piece){
             wPassant.where=0; wPassant.move=0; wPassant.passant= false;
         }
     }
+    
+    if(piece.charAt(1)== 'k' && Math.abs(from-to)==2){      // has the king Castled
+        if(piece.charAt(0)== 'w'){
+            if(to==59){                                     // long castle white
+                printSquare(57, '');
+                printSquare(60, 'wr');
+            }
+            if(to==63){                                     // short castle white
+                printSquare(64,'');
+                printSquare(62, 'wr');
+            }
+        }else{
+            if(to==3){                                      // long castle black
+                printSquare(1, '');
+                printSquare(4, 'br');
+            }
+            if(to==7){                                      // short castle black
+                printSquare(8, '');
+                printSquare(6, 'br');
+            }
+        }
+    }
 
     soundAlert('valid');
     moves.push({'piece':pieceAt(to), 'rank':rank(to), 'file':file(to)});     // record moves, especially for passant sake
@@ -355,7 +376,6 @@ function validPawn(from, to){
 
 function validRook(from, to){        // probably don't need to check if to is empty
         
-    if(castle.isCastlePiece(from))  {castle.recordMove(from);}  // record the rook move for castling reference
     if(file(from)== file(to)){                                  // moving North or South
         if(from > to){
             for(let path= from-8; path>= to+8; path-=8){        // scan North between from and to
@@ -452,11 +472,12 @@ function validQueen(from, to){       // Queen mimics bishop and rook validation
 
 function validKing(from, to){
 
+    // DELETE OPPONENTCOLOUR CONST AND SUBSTITURE WITH opponent()
+
     const path= Math.abs(from-to);
     const opponentColour= playerAt(from)== 'w'? 'b': 'w';
     const target= [1, -1, 7, -7, 8, -8, 9, -9];           // scan targets only, no actual path
 
-    if(castle.isCastlePiece(from))  {castle.recordMove(from);}
     switch(path){
         case 1:    
         case 7:
@@ -472,17 +493,36 @@ function validKing(from, to){
                     return true;
                 }
                 break;
-        case 2: return false;   // King castles
+        case 2: if(from-to >0){                             // long castle
+                    if(!castle.hasRookMoved(from-4)){
+                        const cloneSquareArr= [...squareArr];
+                        for(let i=0; i<3; i++){
+                            if( (cloneSquareArr[from-i] != '' && i!= 0)     // squares between king and rook empty (except king square)
+                                || isInCheck(from-i, opponent(), cloneSquareArr)){  // and squares not under attack
+                                return false;
+                            }
+                        }
+                    }
+                }else{
+                    if(!castle.hasRookMoved(from+3)){           // short castle
+                        const cloneSquareArr= [...squareArr];
+                        for(let i=0; i<3; i++){
+                            if( (cloneSquareArr[from+i] != '' && i!= 0)     // squares between king and rook empty (except king square)
+                                || isInCheck(from+i, opponent(), cloneSquareArr)){  // and squares not under attack
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;    // King castles
 
         default:    return false;
     }
 }
 
-// validation functions found in './logic.js'
 function validMove(from, to, piece){
 
     let rtnVal;
-    if(pieceAt(to)=='k') {return false;}    // this can not occur once check handling is resloved
     switch(pieceAt(from)){
         case 'p':   rtnVal = validPawn  (from, to); break;
         case 'r':   rtnVal = validRook  (from, to); break; 
@@ -494,6 +534,7 @@ function validMove(from, to, piece){
     }
     if(!rtnVal) return false;
 
+    // copy square array, declare arguments for check function
     const cloneSquareArr = [...squareArr];
     cloneSquareArr[from]= '';
     cloneSquareArr[to]= piece;
@@ -508,12 +549,16 @@ function validMove(from, to, piece){
         rtnVal= false;
     }
     else {rtnVal= true;}
-    if(check) {soundAlert('check')};
-    
+    if(check && !selfCheck) {soundAlert('check')};
+
+    if(from== 5) {castle.recordMove(1);  castle.recordMove(8);}     // black king moved, disable castle
+    if(from==61) {castle.recordMove(57); castle.recordMove(64);}    // white king moved, disable castle
+    if(castle.isRook(from))  {castle.recordMove(from);}             // rook moved, disable castle on this rook side
+
     return rtnVal;
 }
 
-function isInCheck(square, attackerColour, cloneSquareArr){      // scan attack lines using King as Point of Origin
+function isInCheck(square, attackerColour, cloneSquareArr){      // scan attack lines using square as Point of Origin
 
     // console.table({ "defender content": cloneSquareArr[square],
     //                 "defending square": square,
@@ -529,15 +574,15 @@ function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan att
     const attackLines = [
         // Array of objects containing an attacking piece, initializer, condition function, and incrementer for the nested loops below
         // first four elements dedicated to Rook and Queen lines
-        { piece: 'r', start: square + 8, condition: (path) => path <= 64, increment:  8 },                      // South
-        { piece: 'r', start: square - 8, condition: (path) => path >= 1,  increment: -8 },                      // North
+        { piece: 'r', start: square + 8, condition: (path) => path <= 64, increment:  8 },                    // South
+        { piece: 'r', start: square - 8, condition: (path) => path >= 1,  increment: -8 },                    // North
         { piece: 'r', start: square - 1, condition: (path) => rank(path) === rank(square), increment: -1 },   // West
         { piece: 'r', start: square + 1, condition: (path) => rank(path) === rank(square), increment:  1 },   // East
         // next four elements dedicated to Bishop and Queen lines
-        { piece: 'b', start: square - 9, condition: (path) => path >= 10 && file(path) < file(square), increment: -9 },   // North-West
-        { piece: 'b', start: square + 9, condition: (path) => path <= 55 && file(path) > file(square), increment: +9 },   // South-East
-        { piece: 'b', start: square - 7, condition: (path) => path >= 9  && file(path) > file(square), increment: -7 },   // North-East
-        { piece: 'b', start: square + 7, condition: (path) => path <= 56 && file(path) < file(square), increment: +7 },   // South-West
+        { piece: 'b', start: square - 9, condition: (path) => path >= 1  && file(path) < file(square), increment: -9 },   // North-West
+        { piece: 'b', start: square + 9, condition: (path) => path <= 64 && file(path) > file(square), increment: +9 },   // South-East
+        { piece: 'b', start: square - 7, condition: (path) => path >= 1  && file(path) > file(square), increment: -7 },   // North-East
+        { piece: 'b', start: square + 7, condition: (path) => path <= 64 && file(path) < file(square), increment: +7 },   // South-West
     ];
 
     for (let i = 0; i < attackLines.length; i++) {
