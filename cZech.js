@@ -563,26 +563,27 @@ function isInCheck(square, attackerColour, cloneSquareArr){      // scan attack 
     // console.table({ "defender content": cloneSquareArr[square],
     //                 "defending square": square,
     //                 "attacker colour":  attackerColour });
-
-    if(compassCheck(square, attackerColour, cloneSquareArr)) return true;
-    if(knightCheck(square, attackerColour, cloneSquareArr)) return true;
-    if(pawnCheck(square, attackerColour, cloneSquareArr)) return true;
-    return false;
+    let rtnVal= false;
+    if(compassCheck(square, attackerColour, cloneSquareArr)) rtnVal= true;
+    if(knightCheck(square, attackerColour, cloneSquareArr)) rtnVal= true;
+    if(pawnCheck(square, attackerColour, cloneSquareArr)) rtnVal= true;
+    return rtnVal;
 }
 
 function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan attack lines for Queen, Rook and Bishop
+    
+    let rtnVal= false;
     const attackLines = [
         // Array of objects containing an attacking piece, initializer, condition function, and incrementer for the nested loops below
-        // first four elements dedicated to Rook and Queen lines
-        { piece: 'r', start: square + 8, condition: (path) => path <= 64, increment:  8 },                    // South
-        { piece: 'r', start: square - 8, condition: (path) => path >= 1,  increment: -8 },                    // North
-        { piece: 'r', start: square - 1, condition: (path) => rank(path) === rank(square), increment: -1 },   // West
-        { piece: 'r', start: square + 1, condition: (path) => rank(path) === rank(square), increment:  1 },   // East
-        // next four elements dedicated to Bishop and Queen lines
-        { piece: 'b', start: square - 9, condition: (path) => path >= 1  && file(path) < file(square), increment: -9 },   // North-West
-        { piece: 'b', start: square + 9, condition: (path) => path <= 64 && file(path) > file(square), increment: +9 },   // South-East
-        { piece: 'b', start: square - 7, condition: (path) => path >= 1  && file(path) > file(square), increment: -7 },   // North-East
-        { piece: 'b', start: square + 7, condition: (path) => path <= 64 && file(path) < file(square), increment: +7 },   // South-West
+        // first four elements dedicated to Rook and Queen lines, the last four are Bishop and Queen lines
+        { piece: 'r', start: square + 8, condition: (path) => path <= 64, increment:  8 },                              // South
+        { piece: 'r', start: square - 8, condition: (path) => path >= 1,  increment: -8 },                              // North
+        { piece: 'r', start: square - 1, condition: (path) => rank(path) === rank(square), increment: -1 },             // West
+        { piece: 'r', start: square + 1, condition: (path) => rank(path) === rank(square), increment:  1 },             // East
+        { piece: 'b', start: square - 9, condition: (path) => path >= 1  && file(path) < file(square), increment: -9 }, // North-West
+        { piece: 'b', start: square + 9, condition: (path) => path <= 64 && file(path) > file(square), increment: +9 }, // South-East
+        { piece: 'b', start: square - 7, condition: (path) => path >= 1  && file(path) > file(square), increment: -7 }, // North-East
+        { piece: 'b', start: square + 7, condition: (path) => path <= 64 && file(path) < file(square), increment: +7 }, // South-West
     ];
 
     for (let i = 0; i < attackLines.length; i++) {
@@ -590,25 +591,32 @@ function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan att
         for (let path = start; condition(path); path += increment) {            // annonymous object properties dictate for loop settings
             if (cloneSquareArr[path] === '') continue;
             if (cloneSquareArr[path] === attackerColour + piece || cloneSquareArr[path] === attackerColour + 'q') {   // is attacker present
+                // current player attacking, then check for check(s)
+                if(attackerColour==currentPlayer()){
+                    console.log(`Can the ${attackerColour + cloneSquareArr[path].charAt(1)} at ${path} be killed?
+                                ${isInCheck(path,opponent(),cloneSquareArr)}`);
+                }
+                console.log(`Called from: ${attackerColour==currentPlayer()? 'check': 'self-check'}`);
                 console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech  by the ${attackerColour + cloneSquareArr[path].charAt(1)}`);
-                return true;
+                rtnVal= true;
             }
             else {break;}       // non threatening piece found
         }
     }
-    return false; // Could not find check, return false
+    return rtnVal; // Could not find check, return false
 }
 
-function pawnCheck(square, attackerColour, cloneSquareArr){
-    const king= cloneSquareArr[square];
-    if(king== 'wk'  && ( (cloneSquareArr[square -7]== 'bp' && file(square) != 8 )
-                    ||   (cloneSquareArr[square -9]== 'bp' && file(square) != 1))){    // are black pawns attacking white king from NE and NW
-        console.log(`Oh Oh... ${king} is in cZech by the ${attackerColour + 'p'}`);
+function pawnCheck(square, attackerColour, cloneSquareArr){  //REVISED REVISED
+
+    const defender= cloneSquareArr[square].charAt(0);
+    if(defender== 'w'   && ( (cloneSquareArr[square -7]== 'bp' && file(square) != 8 )
+                        ||   (cloneSquareArr[square -9]== 'bp' && file(square) != 1))){    // are black pawns attacking white king from NE and NW
+        console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the bp`);
         return true;
     }
-    if(king=='bk' && ( (cloneSquareArr[square +7]== 'wp' && file(square) != 1)
-                  ||   (cloneSquareArr[square +9]== 'wp' && file(square) != 8))){     // are white pawns attacking black king from SE and SW
-        console.log(`Oh Oh... ${king} is in cZech by the ${attackerColour + 'p'}`);
+    if(defender=='b'    && ( (cloneSquareArr[square +7]== 'wp' && file(square) != 1)
+                        ||   (cloneSquareArr[square +9]== 'wp' && file(square) != 8))){     // are white pawns attacking black king from SE and SW
+        console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the wp`);
        return true;
     }
 }
