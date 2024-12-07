@@ -48,10 +48,11 @@ const rs = getComputedStyle(r);
 
 const castle = {    // properties with numeric keys represent rook and king squares, values represent whether they have ever moved
     1: false,   57: false,
+    5: false,   61: false,
     8: false,   64: false,
 
     isRook(square)          {return Object.hasOwn(this, square);},
-    hasRookMoved(square)    {return this[square];},
+    hasPieceMoved(square)   {return this[square];},
     recordMove(square)      {this[square] = true;},
 };
 
@@ -415,14 +416,14 @@ function validRook(from, to){        // probably don't need to check if to is em
 function validBishop(from, to){      // probably don't need to check if to is empty
 
     if(from %9 == to %9){                                       // moving NorthWest or SouthEast
-        if(from> to){       
+        if(from> to && file(from)!= 1){       
             for(let path= from-9; path>= to+9; path -=9){       // scan NorthWest between from and to
-                if(pieceAt(path)!= '') {return false;}
+                if(pieceAt(path)!= '') return false;
                 if(file(path)== 1 && path!= to) {return false;} // border reached, stop scanning
             }
             if(pieceAt(to)== '' || playerAt(from)!= playerAt(to)) {return true;}    // is target empty or occupied by opponent
         }
-        else{
+        if(from< to && file(from)!= 8){
             for(let path= from+9; path<= to-9; path +=9){       // scan SouthEast between from and to
                 if(pieceAt(path)!= '') {return false;}
                 if(file(path)== 8 && path!= to) {return false;} // border reached, stop scanning
@@ -432,14 +433,14 @@ function validBishop(from, to){      // probably don't need to check if to is em
     }
 
     if(from %7 == to %7){                                       // moving NorthEast or SouthWest
-        if(from> to){
+        if(from> to && file(from)!= 8){
             for(let path= from-7; path>= to+7; path -=7){       // scan NorthEast between from and to
                 if(pieceAt(path)!= '') {return false;}
                 if(file(path)== 8 && path!= to) {return false;} // border reached, stop scanning
             }
             if(pieceAt(to)== '' || playerAt(from)!= playerAt(to)) {return true;}    // is target empty or occupied by opponent
         }
-        else{
+        if(from< to && file(from)!= 1){
             for(let path= from+7; path<= to-7; path +=7){       // scan SouthWest between from and to
                 if(pieceAt(path)!= '') {return false;}
                 if(file(path)== 1 && path!= to) {return false;} // border reached, stop scanning
@@ -485,40 +486,47 @@ function validKing(from, to){
         case 9: if(pieceAt(to)== '' || playerAt(from) != playerAt(to)){     // is target empty or occupied by opponent
                     for(let path of target) {
                         if(to+path >=1 && to+path <=64){                    // prevent breach of North and South border
+                            if( Math.abs(file(from) - file(to)) >1) return false;
                             if(Math.abs(file(to+path) - file(from)) <3){    // breach border East or West creates file gap greater than 2
                                 if(squareArr[to+path]== opponentColour + 'k') return false;     // adjacent Kings not allowed 
                             }
+                            
                         }
                     }
                     return true;
                 }
                 break;
-        case 2: if(from-to >0){                             // long castle
-                    if(!castle.hasRookMoved(from-4)){
-                        const cloneSquareArr= [...squareArr];
-                        for(let i=0; i<3; i++){
-                            if( (cloneSquareArr[from-i] != '' && i!= 0)     // squares between king and rook empty (except king square)
-                                || isInCheck(from-i, opponent(), cloneSquareArr)){  // and squares not under attack
-                                return false;
+
+            case 2: if((from==5 && !castle.hasPieceMoved(5)) || (from==61) && !castle.hasPieceMoved(61)){  // King and rook have not moved
+                        if(from-to >0){     // long castle
+                            if(!castle.hasPieceMoved(from-4)){              // long Rook has not moved
+                                const cloneSquareArr= [...squareArr];       // clone array for isInCheck function
+                                for(let i=0; i<3; i++){                     // check vacancy for 3 squares
+                                    if( (cloneSquareArr[from-i] != '' && i!= 0)     // squares between king and rook not empty (except king square)
+                                        || isInCheck(from-i, opponent(), cloneSquareArr)){  // OR squares under attack
+                                        return false;       // failed condition above
+                                    }
+                                }
+                            }
+                        }else{      // short castle
+                            if(!castle.hasPieceMoved(from+3)){                  // short Rook has not moved         
+                                const cloneSquareArr= [...squareArr];           // clone array for isInCheck function
+                                for(let i=0; i<3; i++){                         // check vacancy for 3 squares
+                                    if( (cloneSquareArr[from+i] != '' && i!= 0)     // squares between king and rook not empty (except king square)
+                                        || isInCheck(from+i, opponent(), cloneSquareArr)){  // OR squares under attack
+                                        return false;       // failed condition above
+                                    }
+                                }
                             }
                         }
-                    }
-                }else{
-                    if(!castle.hasRookMoved(from+3)){           // short castle
-                        const cloneSquareArr= [...squareArr];
-                        for(let i=0; i<3; i++){
-                            if( (cloneSquareArr[from+i] != '' && i!= 0)     // squares between king and rook empty (except king square)
-                                || isInCheck(from+i, opponent(), cloneSquareArr)){  // and squares not under attack
-                                return false;
-                            }
-                        }
-                    }
-                }
-                return true;    // King castles
+                        return true;        // castle range was vacant and free of attack - KING CASTLES
+                    }else{return false;}    // King and Rook moved from starter square -KING CANT CASTLE
+
 
         default:    return false;
     }
 }
+
 
 function validMove(from, to, piece){
 
@@ -563,16 +571,30 @@ function isInCheck(square, attackerColour, cloneSquareArr){      // scan attack 
     // console.table({ "defender content": cloneSquareArr[square],
     //                 "defending square": square,
     //                 "attacker colour":  attackerColour });
+
     let rtnVal= false;
-    if(compassCheck(square, attackerColour, cloneSquareArr)) rtnVal= true;
-    if(knightCheck(square, attackerColour, cloneSquareArr)) rtnVal= true;
-    if(pawnCheck(square, attackerColour, cloneSquareArr)) rtnVal= true;
+    const checks= [];
+
+    [   compassCheck(square, attackerColour, cloneSquareArr),
+        knightCheck(square, attackerColour, cloneSquareArr),
+        pawnCheck(square, attackerColour, cloneSquareArr)
+    ]   .forEach( (rtn) => {if(rtn!== undefined) checks.push(rtn)} );
+    
+    console.log(`Returned to isInCheck: ${checks}`); 
+    console.table(checks);
+
+    // checks.forEach( (path) => { console.log(`attacker: ${path[path.length -1]}`)});
+       
+
+
+    if(checks.length) rtnVal=true;
     return rtnVal;
 }
 
 function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan attack lines for Queen, Rook and Bishop
     
-    let rtnVal= false;
+    let rtnVal= undefined;
+    const checks=[];
     const attackLines = [
         // Array of objects containing an attacking piece, initializer, condition function, and incrementer for the nested loops below
         // first four elements dedicated to Rook and Queen lines, the last four are Bishop and Queen lines
@@ -587,18 +609,23 @@ function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan att
     ];
 
     for (let i = 0; i < attackLines.length; i++) {
+        const checkLine= [];
         const { piece, start, condition, increment } = attackLines[i];          // annonymous object properties assigned from attackLines elements 
         for (let path = start; condition(path); path += increment) {            // annonymous object properties dictate for loop settings
+            checkLine.push(path)
             if (cloneSquareArr[path] === '') continue;
             if (cloneSquareArr[path] === attackerColour + piece || cloneSquareArr[path] === attackerColour + 'q') {   // is attacker present
                 // current player attacking, then check for check(s)
+                checks.push(checkLine);
                 if(attackerColour==currentPlayer()){
                     console.log(`Can the ${attackerColour + cloneSquareArr[path].charAt(1)} at ${path} be killed?
                                 ${isInCheck(path,opponent(),cloneSquareArr)}`);
                 }
                 console.log(`Called from: ${attackerColour==currentPlayer()? 'check': 'self-check'}`);
                 console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech  by the ${attackerColour + cloneSquareArr[path].charAt(1)}`);
-                rtnVal= true;
+                // console.log(`From CompassCheck ${checks}`);
+                rtnVal= checks;
+                break;
             }
             else {break;}       // non threatening piece found
         }
@@ -608,21 +635,23 @@ function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan att
 
 function pawnCheck(square, attackerColour, cloneSquareArr){  //REVISED REVISED
 
+    let rtnVal= undefined;
     const defender= cloneSquareArr[square].charAt(0);
-    if(defender== 'w'   && ( (cloneSquareArr[square -7]== 'bp' && file(square) != 8 )
-                        ||   (cloneSquareArr[square -9]== 'bp' && file(square) != 1))){    // are black pawns attacking white king from NE and NW
-        console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the bp`);
-        return true;
+    if(defender== 'w'){
+        if(cloneSquareArr[square -7]== 'bp' && file(square) != 8)   rtnVal= [square-7];     // bp attacking wk from NE
+        if(cloneSquareArr[square -9]== 'bp' && file(square) != 1)   rtnVal= [square-9];     // bp attacking wk from NW
     }
-    if(defender=='b'    && ( (cloneSquareArr[square +7]== 'wp' && file(square) != 1)
-                        ||   (cloneSquareArr[square +9]== 'wp' && file(square) != 8))){     // are white pawns attacking black king from SE and SW
-        console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the wp`);
-       return true;
+    if(defender=='b'){
+        if(cloneSquareArr[square +7]== 'wp' && file(square) != 1)   rtnVal= [square+7];     // wp attacking bk from SW
+        if(cloneSquareArr[square +9]== 'wp' && file(square) != 8)   rtnVal= [square+9];     // wp attacking bk from SE
     }
+    if(rtnVal!== undefined) console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the ${rtnVal< square? 'bp': 'wp'}`);
+    return rtnVal;
 }
 
 function knightCheck(square, attackerColour, cloneSquareArr){             // scan hops of the knight
 
+    let rtnVal= undefined;
     const attackLines = [6, -6, 10, -10, 15, -15, 17, -17];     // hops measure the distance between king and knight
     for(let path of attackLines){
         const knightAt= square + path;
@@ -630,12 +659,12 @@ function knightCheck(square, attackerColour, cloneSquareArr){             // sca
             if(getId(square).style.background != getId(knightAt).style.background){     // knight moves to opposite square colour
                 if(cloneSquareArr[knightAt]== attackerColour + 'n'){                         // attacking knight found
                     console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the ${attackerColour + cloneSquareArr[knightAt].charAt(1)}`);
-                    return true;                    
+                    return [knightAt];                    
                 }
             }
         }
     }
-    return false;
+    return rtnVal;
 }
 
 // ************ Executable Code **************** //
