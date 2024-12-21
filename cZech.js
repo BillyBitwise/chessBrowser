@@ -6,12 +6,13 @@
 /*  Audio:   https://pixabay.com/sound-effects/error-126627/                                    */
 /*           https://pixabay.com/sound-effects/knocking-on-the-board-158172/                    */
 /*           https://pixabay.com/sound-effects/success-fanfare-trumpets-6185/                   */
+/*           https://pixabay.com/sound-effects/goodresult-82807/                                */
 /*                                                                                              */
 /*  Images:  https://commons.wikimedia.org/wiki/Category:PNG_chess_pieces/Standard_transparent  */
 /*                                                                                              */
 /************************************************************************************************/
 
-const squareArr=  [ true,
+let squareArr=  [ true,
                     "br", "bn", "bb", "bq", "bk", "bb", "bn", "br",
                     "bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp",
                             "", "", "", "", "", "", "", "",
@@ -29,9 +30,10 @@ function setColumns(c)  { r.style.setProperty('--columns', c)}          // chang
 function rank(num)      { return 9-(Math.ceil(num/8));}
 function file(num)      { return num%8? num%8: 8;}
 function getId(ele)     { return document.getElementById(ele);}
-function bgColour(ele, colour)  { ele.style= (colour=="white") ?"background:white" :"background:grey";}
+function bgColour(ele, colour)  { ele.style= (colour=="white") ?"background:#ddd" :"background:grey";}
 
 let currentPlayer=  () => getId('board').dataset.player.charAt(0);
+let changePlayer=   () => getId('board').dataset.player= currentPlayer()== 'w'? 'black': 'white';
 let opponent=       () => currentPlayer()== 'w'? 'b': 'w';
 let playerAt=       (where) => squareArr[where].charAt(0);
 let pieceAt=        (where) => squareArr[where].charAt(1);
@@ -209,6 +211,7 @@ function move(from, to, piece){
         return;
     }
 
+    // if(pieceAt(to)=='r' && !castle.hasPieceMoved(to)) castle.recordMove(to);
     printSquare(from, "");
     printSquare(to, piece);
 
@@ -309,6 +312,12 @@ function soundAlert(soundType){
             const checkSound= new Audio('assets/sounds/check.mp3');
             checkSound.volume= 0.3;
             checkSound.play();
+            break;
+
+        case 'checkMate':
+            const checkMateSound= new Audio('assets/sounds/checkMate.mp3');
+            checkMateSound.volume= 0.5;
+            checkMateSound.play();
             break;
 
         default:    break;
@@ -475,6 +484,7 @@ function validKing(from, to){
 
     // DELETE OPPONENTCOLOUR CONST AND SUBSTITURE WITH opponent()
 
+    let kingInterference=false;
     const path= Math.abs(from-to);
     const opponentColour= playerAt(from)== 'w'? 'b': 'w';
     const target= [1, -1, 7, -7, 8, -8, 9, -9];           // scan targets only, no actual path
@@ -489,44 +499,58 @@ function validKing(from, to){
                             if( Math.abs(file(from) - file(to)) >1) return false;
                             if(Math.abs(file(to+path) - file(from)) <3){    // breach border East or West creates file gap greater than 2
                                 if(squareArr[to+path]== opponentColour + 'k') return false;     // adjacent Kings not allowed 
-                            }
-                            
+                            }   
                         }
                     }
                     return true;
                 }
                 break;
 
-            case 2: if((from==5 && !castle.hasPieceMoved(5)) || (from==61) && !castle.hasPieceMoved(61)){  // King and rook have not moved
-                        if(from-to >0){     // long castle
-                            if(!castle.hasPieceMoved(from-4)){              // long Rook has not moved
-                                const cloneSquareArr= [...squareArr];       // clone array for isInCheck function
-                                for(let i=0; i<3; i++){                     // check vacancy for 3 squares
-                                    if( (cloneSquareArr[from-i] != '' && i!= 0)     // squares between king and rook not empty (except king square)
-                                        || isInCheck(from-i, opponent(), cloneSquareArr)){  // OR squares under attack
-                                        return false;       // failed condition above
-                                    }
+        //Castling
+        case 2: const cloneSquareArr= [...squareArr];   // clone array for isInCheck function
+                if((from==5 && !castle.hasPieceMoved(5)) || (from==61) && !castle.hasPieceMoved(61)){  // King and rook have not moved
+                    if(from-to >0){     // long castle
+                        if(!castle.hasPieceMoved(from-4)){      // long Rook has not moved
+                            // rare case when opponent King encroaches King square after castle
+                            if(cloneSquareArr[from-4].charAt(1) !='r') return false;
+                            if(currentPlayer()=='w') { [50,51].forEach( (index) => { if(cloneSquareArr[index]=='bk') kingInterference= true;}) }
+                            if(currentPlayer()=='b') { [10,11].forEach( (index) => { if(cloneSquareArr[index]=='wk') kingInterference= true;}) }
+
+                            for(let i=0; i<3; i++){             // check vacancy for 3 squares
+                                if( (cloneSquareArr[from-i] != '' && i!= 0)     // squares between king and rook not empty (except king square)
+                                    || isInCheck(from-i, opponent(), cloneSquareArr)){  // OR squares under attack
+                                    return false;       // failed condition above
                                 }
                             }
-                        }else{      // short castle
-                            if(!castle.hasPieceMoved(from+3)){                  // short Rook has not moved         
-                                const cloneSquareArr= [...squareArr];           // clone array for isInCheck function
-                                for(let i=0; i<3; i++){                         // check vacancy for 3 squares
-                                    if( (cloneSquareArr[from+i] != '' && i!= 0)     // squares between king and rook not empty (except king square)
-                                        || isInCheck(from+i, opponent(), cloneSquareArr)){  // OR squares under attack
-                                        return false;       // failed condition above
-                                    }
+                        }else{ return false;}   // long rook already moved 
+                    
+                    }else{      // short castle
+                        if(!castle.hasPieceMoved(from+3)){      // short Rook has not moved         
+                            // rare case when opponent King encroaches King square after castle// only square 55 and 15 needs checking
+                            if(cloneSquareArr[from+3].charAt(1) !='r') return false;
+                            if(currentPlayer()=='w') { [55,56].forEach( (index) => { if(cloneSquareArr[index]=='bk') kingInterference= true;}) }
+                            if(currentPlayer()=='b') { [15,16].forEach( (index) => { if(cloneSquareArr[index]=='wk') kingInterference= true;}) }
+
+                            for(let i=0; i<3; i++){             // check vacancy for 3 squares
+                                if( (cloneSquareArr[from+i] != '' && i!= 0)     // squares between king and rook not empty (except king square)
+                                    || isInCheck(from+i, opponent(), cloneSquareArr)){  // OR squares under attack
+                                    return false;       // failed condition above
                                 }
                             }
-                        }
-                        return true;        // castle range was vacant and free of attack - KING CASTLES
-                    }else{return false;}    // King and Rook moved from starter square -KING CANT CASTLE
+                        }else{ return false;}   // short rook already moved 
+                    } 
+                    if(kingInterference){   // if opponent king interfers with castling, DENY CASTLE
+                        soundAlert('inValid');
+                        console.log(`opponent king at ${currentPlayer()=='w'? cloneSquareArr.indexOf('bk'): cloneSquareArr.indexOf('wk')} interfers with castling`);
+                        return false;  
+                    }
+                    return true;        // castle range was vacant and free of attack - KING CASTLES
+                }else
+                    {return false;}    // King and Rook moved from starter square -KING CANT CASTLE
 
-
-        default:    return false;
+            default:    return false;
     }
 }
-
 
 function validMove(from, to, piece){
 
@@ -542,15 +566,17 @@ function validMove(from, to, piece){
     }
     if(!rtnVal) return false;
 
-    // copy square array, declare arguments for check function
-    const cloneSquareArr = [...squareArr];
-    cloneSquareArr[from]= '';
-    cloneSquareArr[to]= piece;
-    const currentPlayerKing= cloneSquareArr.indexOf(currentPlayer() +'k');
-    const opponentKing = cloneSquareArr.indexOf(opponent() +'k');
+    let copySquareArr= JSON.parse(JSON.stringify(squareArr));
+    squareArr[from]= '';
+    squareArr[to]= piece;
+    // console.log('SQUARE ARRAY AFTER', JSON.parse(JSON.stringify(squareArr)));
+    // console.log('COPY OF SQUARE ARRAY AFTER', JSON.parse(JSON.stringify(copySquareArr)));
 
-    let selfCheck= isInCheck(currentPlayerKing, opponent(), cloneSquareArr);
-    let check= isInCheck(opponentKing, currentPlayer(), cloneSquareArr);
+    const currentPlayerKing= squareArr.indexOf(currentPlayer() +'k');
+    const opponentKing = squareArr.indexOf(opponent() +'k');
+
+    let selfCheck= isInCheck(currentPlayerKing, opponent());
+    let check= isInCheck(opponentKing, currentPlayer());
     
     if(selfCheck){
         console.log("You can not place your king in peril");
@@ -563,35 +589,86 @@ function validMove(from, to, piece){
     if(from==61) {castle.recordMove(57); castle.recordMove(64);}    // white king moved, disable castle
     if(castle.isRook(from))  {castle.recordMove(from);}             // rook moved, disable castle on this rook side
 
+    squareArr= copySquareArr;
+    // console.log('SQUARE ARRAY AFTER CHECKS', JSON.parse(JSON.stringify(squareArr)));
+
     return rtnVal;
 }
 
-function isInCheck(square, attackerColour, cloneSquareArr){      // scan attack lines using square as Point of Origin
-
-    // console.table({ "defender content": cloneSquareArr[square],
-    //                 "defending square": square,
-    //                 "attacker colour":  attackerColour });
+// selfCheck- attackerColour=opponent   // check- attackerColour= currentPlayer
+// square is usually King, unless you want to know if a piece can be removed?
+function isInCheck(square, attackerColour){      
 
     let rtnVal= false;
     const checks= [];
+    const attackers = [];
+    const path= [];
+    const calledFrom= attackerColour==opponent()? 'selfCheck': 'check';
 
-    [   compassCheck(square, attackerColour, cloneSquareArr),
-        knightCheck(square, attackerColour, cloneSquareArr),
-        pawnCheck(square, attackerColour, cloneSquareArr)
-    ]   .forEach( (rtn) => {if(rtn!== undefined) checks.push(rtn)} );
+    [ compassCheck(square, attackerColour),
+      knightCheck(square, attackerColour),
+      pawnCheck(square, attackerColour)
+    ] .forEach( (rtn) => {if(rtn!== undefined) checks.push(rtn)} );   
     
-    console.log(`Returned to isInCheck: ${checks}`); 
-    console.table(checks);
-
-    // checks.forEach( (path) => { console.log(`attacker: ${path[path.length -1]}`)});
+    // checks.length ??????
+    if(checks.length) rtnVal=true;              // self check conditions stop here
+    
+    if(checks.length && calledFrom== 'check'){  // subsequent conditions are looking for mate against opponent
+        // console.table(checks);
+        checks.forEach( (lines) => {
+          lines.forEach( (line) => {
+            line.forEach( (sqr, index, sqrArr) =>{
+                if(index== sqrArr.length-1) {attackers.push(sqr);}   // fill attackers and path arrays to check for mate  
+                else {path.push(sqr);}
+            })
+          });
+        });
+        rtnVal=true;    // rtnVal will already be true
        
+        //isMate( checkArr, square )
+        if(attackers.length== 1 && pieceAt(attackers[0])== 'n'){
+            // console.log('knight check');
+            console.log(`Can the knight at ${attackers[0]} be killed? ${isInCheck(attackers[0], opponent())}`);
 
+        }
+        if(attackers.length> 1){
+        // if(checks[0].length> 1){
+            console.log(`Double check:  ${squareArr[square]} at ${square} must move to relieve check`);
+            const target= [1, -1, 7, -7, 8, -8, 9, -9];
+            const validKingMoves=[];
 
-    if(checks.length) rtnVal=true;
+            // what if king can kill attacker?????  
+            changePlayer();
+            target.forEach( (move) => {
+                // if(validMove(square, square+ move, squareArr[square])) validKingMoves.push(square+ move); 
+                if(validKing(square, square+ move)) validKingMoves.push(square+ move);
+            });
+
+            let isMate= true;
+            console.log("valid King Moves", validKingMoves);
+            const invalidKingMoves=  path.hasEqualElements(validKingMoves);
+            for(const kingMove of validKingMoves){
+                if(!invalidKingMoves.includes(kingMove)){
+                    let copySquareArr= JSON.parse(JSON.stringify(squareArr));
+                    squareArr[square]= '';
+                    squareArr[kingMove]= currentPlayer() + 'k';
+                    if(!isInCheck(kingMove, opponent())) isMate= false;
+                    // console.log(`King can move to square ${kingMove} : ${!isInCheck(kingMove, opponent())} `);
+                    squareArr= copySquareArr;
+                }
+            }
+            changePlayer();
+            if(isMate){
+                console.log(`Congradulations ${formatColour(currentPlayer())}. That's a cZechMate `);
+                soundAlert('checkMate');
+            }
+        }
+    }
+
     return rtnVal;
 }
 
-function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan attack lines for Queen, Rook and Bishop
+function compassCheck(square, attackerColour){     // scan attack lines for Queen, Rook and Bishop
     
     let rtnVal= undefined;
     const checks=[];
@@ -613,17 +690,15 @@ function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan att
         const { piece, start, condition, increment } = attackLines[i];          // annonymous object properties assigned from attackLines elements 
         for (let path = start; condition(path); path += increment) {            // annonymous object properties dictate for loop settings
             checkLine.push(path)
-            if (cloneSquareArr[path] === '') continue;
-            if (cloneSquareArr[path] === attackerColour + piece || cloneSquareArr[path] === attackerColour + 'q') {   // is attacker present
+            if (squareArr[path] === '') continue;
+            if (squareArr[path] === attackerColour + piece || squareArr[path] === attackerColour + 'q') {   // is attacker present
                 // current player attacking, then check for check(s)
                 checks.push(checkLine);
-                if(attackerColour==currentPlayer()){
-                    console.log(`Can the ${attackerColour + cloneSquareArr[path].charAt(1)} at ${path} be killed?
-                                ${isInCheck(path,opponent(),cloneSquareArr)}`);
-                }
-                console.log(`Called from: ${attackerColour==currentPlayer()? 'check': 'self-check'}`);
-                console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech  by the ${attackerColour + cloneSquareArr[path].charAt(1)}`);
-                // console.log(`From CompassCheck ${checks}`);
+                // if(attackerColour==currentPlayer()){
+                //     console.log(`Can the ${attackerColour + squareArr[path].charAt(1)} at ${path} be killed?
+                //                 ${isInCheck(path,opponent(),squareArr)}`);
+                // }
+                console.log(`Oh Oh... ${squareArr[square]} is in cZech  by the ${attackerColour + squareArr[path].charAt(1)}`);
                 rtnVal= checks;
                 break;
             }
@@ -633,23 +708,24 @@ function compassCheck(square, attackerColour, cloneSquareArr ) {     // scan att
     return rtnVal; // Could not find check, return false
 }
 
-function pawnCheck(square, attackerColour, cloneSquareArr){  //REVISED REVISED
+function pawnCheck(square, attackerColour){  //REVISED REVISED
 
     let rtnVal= undefined;
-    const defender= cloneSquareArr[square].charAt(0);
+
+    const defender= squareArr[square].charAt(0);
     if(defender== 'w'){
-        if(cloneSquareArr[square -7]== 'bp' && file(square) != 8)   rtnVal= [square-7];     // bp attacking wk from NE
-        if(cloneSquareArr[square -9]== 'bp' && file(square) != 1)   rtnVal= [square-9];     // bp attacking wk from NW
+        if(squareArr[square -7]== 'bp' && file(square) != 8)   rtnVal= [[square-7]];     // bp attacking wk from NE
+        if(squareArr[square -9]== 'bp' && file(square) != 1)   rtnVal= [[square-9]];     // bp attacking wk from NW
     }
     if(defender=='b'){
-        if(cloneSquareArr[square +7]== 'wp' && file(square) != 1)   rtnVal= [square+7];     // wp attacking bk from SW
-        if(cloneSquareArr[square +9]== 'wp' && file(square) != 8)   rtnVal= [square+9];     // wp attacking bk from SE
+        if(squareArr[square +7]== 'wp' && file(square) != 1)   rtnVal= [[square+7]];     // wp attacking bk from SW
+        if(squareArr[square +9]== 'wp' && file(square) != 8)   rtnVal= [[square+9]];     // wp attacking bk from SE
     }
-    if(rtnVal!== undefined) console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the ${rtnVal< square? 'bp': 'wp'}`);
+    if(rtnVal!== undefined) console.log(`Oh Oh... ${squareArr[square]} is in cZech by the ${rtnVal< square? 'bp': 'wp'}`);
     return rtnVal;
 }
 
-function knightCheck(square, attackerColour, cloneSquareArr){             // scan hops of the knight
+function knightCheck(square, attackerColour){             // scan hops of the knight
 
     let rtnVal= undefined;
     const attackLines = [6, -6, 10, -10, 15, -15, 17, -17];     // hops measure the distance between king and knight
@@ -657,9 +733,9 @@ function knightCheck(square, attackerColour, cloneSquareArr){             // sca
         const knightAt= square + path;
         if(knightAt >=1 && knightAt <=64){                      //prevent breach of border North and South
             if(getId(square).style.background != getId(knightAt).style.background){     // knight moves to opposite square colour
-                if(cloneSquareArr[knightAt]== attackerColour + 'n'){                         // attacking knight found
-                    console.log(`Oh Oh... ${cloneSquareArr[square]} is in cZech by the ${attackerColour + cloneSquareArr[knightAt].charAt(1)}`);
-                    return [knightAt];                    
+                if(squareArr[knightAt]== attackerColour + 'n'){                         // attacking knight found
+                    console.log(`Oh Oh... ${squareArr[square]} is in cZech by the ${attackerColour + squareArr[knightAt].charAt(1)}`);
+                    return [[knightAt]];                    
                 }
             }
         }
@@ -667,6 +743,24 @@ function knightCheck(square, attackerColour, cloneSquareArr){             // sca
     return rtnVal;
 }
 
+Array.prototype.hasEqualElements= function(arr){
+  
+    const equalElements=[];
+    for(outter of this){
+      for(inner of arr){
+        if(inner=== outter){
+          if(!equalElements.includes(inner)){
+            equalElements.push(inner);
+          }
+        }
+      }
+    }
+    if(equalElements.length){
+      // console.table(equalElements);
+      return equalElements;
+    }
+  }
+  
 // ************ Executable Code **************** //
 // ********************************************* //
 
@@ -674,3 +768,5 @@ Lionel();
 setWidth("60px");
 setColumns(columns);
 printBoard(columns);
+
+// both validKnight() and valideKing() can return nothing and leave an undefined value for rtnVal in validMove()
