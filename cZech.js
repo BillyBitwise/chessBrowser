@@ -43,10 +43,9 @@ const columns = 8;
 const wPassant = { 'where': 0, 'move': 0, 'passant': false };
 const bPassant = { 'where': 0, 'move': 0, 'passant': false };
 const promote = { from: 0, to: 0 };
-const wCastle = { 61: true, 64: true, 57: false };
-const bCastle = { king: 5, short: 8, long: 1, };
 const r = document.querySelector(':root');
 const rs = getComputedStyle(r);
+
 
 const castle = {    // properties with numeric keys represent rook and king squares, values represent whether they have ever moved
     1: false, 57: false,
@@ -562,11 +561,17 @@ function validMove(from, to, piece) {
     }
     if (!rtnVal) return false;
 
+
+    /// RESET PASSANT PROPERTIES EACH MOVE NEEDED ???? MOVE IS UNIQUE
+    /// WHAT ABOUT PROMOTION SIMULATION ?????????????
     let copySquareArr = JSON.parse(JSON.stringify(squareArr));
     squareArr[from] = '';
     squareArr[to] = piece;
-    // console.log('SQUARE ARRAY AFTER', JSON.parse(JSON.stringify(squareArr)));
-    // console.log('COPY OF SQUARE ARRAY AFTER', JSON.parse(JSON.stringify(copySquareArr)));
+    if( (wPassant.passant==true && wPassant.move== moves.length-1) 
+        || bPassant.passant==true && bPassant.move==moves.length-1){
+            if(currentPlayer()=='w') {squareArr[to+8] = '';}
+            else {squareArr[to-8] = '';}
+    }
 
     const currentPlayerKing = squareArr.indexOf(currentPlayer() + 'k');
     const opponentKing = squareArr.indexOf(opponent() + 'k');
@@ -586,85 +591,101 @@ function validMove(from, to, piece) {
     if (castle.isRook(from)) { castle.recordMove(from); }             // rook moved, disable castle on this rook side
 
     squareArr = copySquareArr;
-    // console.log('SQUARE ARRAY AFTER CHECKS', JSON.parse(JSON.stringify(squareArr)));
-
     return rtnVal;
 }
 
-// selfCheck- attackerColour=opponent   // check- attackerColour= currentPlayer
-// square is usually King, unless you want to know if a piece can be removed?
+// selfCheck-   square= currentKing,    attackerColour= opponent()
+// check-       square= oppenentKing,   attackerColour= currentPlayer()
+// square is usually a King, unless you want to know if a piece can be removed?
 function isInCheck(square, attackerColour) {
 
     let rtnVal = [];
     const checks = [];
-    const attackers = [];
+    const checkers = [];
     const path = [];
     const calledFrom = attackerColour == opponent() ? 'selfCheck' : 'check';
 
     [compassCheck(square, attackerColour),
     knightCheck(square, attackerColour),
     pawnCheck(square, attackerColour)
-    ].forEach((rtn) => { if (rtn !== undefined) checks.push(rtn) });
+    ].forEach((rtn) => { if (rtn !== undefined) checks.push(rtn) });   // fill checks array with path of attack
 
     checks.forEach((lines) => {
         lines.forEach((line) => {
             line.forEach((sqr, index, sqrArr) => {
-                if (index == sqrArr.length - 1) { attackers.push(sqr); }   // fill attackers and path arrays to check for mate  
+                if (index == sqrArr.length - 1) { checkers.push(sqr); }   // fill checkers and path arrays to check for mate  
                 else { path.push(sqr); }
             })
         });
     });
-    rtnVal= attackers;
+    rtnVal= checkers;
 
     if (checks.length && calledFrom == 'check') {  // subsequent conditions are looking for mate against opponent
-        if (attackers.length == 1 && pieceAt(attackers[0]) == 'n') {
-            if(!isInCheck(attackers[0], opponent()).length ){
-                if(!canKingMove(square, path)){
-                    console.log(`Congradulations ${formatColour(currentPlayer())}. That's a cZechMate `);
-                    soundAlert('checkMate');    
+        
+        let isMate= true;
+        if (checkers.length == 1) {     // one checker
+
+            let canRemove= false;            
+            const checkRemovers= isInCheck(checkers[0], opponent());    // squares that can remove the Knight
+
+            if(checkRemovers.length){                                   // if removal of check exist
+                console.log(`who can remove check? ${checkRemovers}`);
+                for (const remover of checkRemovers) {                  // for each remover, copy board, simulate removal, change player
+                    let copySquareArr = JSON.parse(JSON.stringify(squareArr));
+                    squareArr[checkers[0]] = squareArr[remover];
+                    squareArr[remover] = '';
+                    changePlayer();
+                    let kingAt= squareArr.indexOf(currentPlayer() +'k');
+                    if (!isInCheck(kingAt, opponent()).length) canRemove = true;   //  self-check after removal, change player, restore board
+                    changePlayer();
+                    squareArr= copySquareArr;
+                    if(canRemove) break;    // no self-check upon removal of checker, break loop
                 }
+
+                // MOVE THIS IN THE ELSE BELOW ???????????????????????????
+                if(!canRemove){
+                    if(!canKingMove(square, false)){
+                        if(pieceAt(checkers[0])== 'n' || pieceAt(checkers[0])=='p') checkMate();
+                    } else {
+                        // canBlock()
+                    }
+                }    // if removal causes self-check, King must move-> Knights can't be blocked
             }
-            
-            // const canBeKilled= isInCheck(attackers[0], opponent());
-            // console.log(`Can the knight at ${attackers[0]} be killed? ${canBeKilled.length==0? 'false':'true'}`);
+            else{
+                if(pieceAt(checkers[0])== 'p') canRemove= canEnPassantRemoveCheck(checkers[0], attackerColour)
+                
+                canKingMove(square, true) }
         }
-        if (attackers.length > 1) {
-            if(!canKingMove(square, path)){
-                console.log(`Congradulations ${formatColour(currentPlayer())}. That's a cZechMate `);
-                soundAlert('checkMate');
-            }
-        }
+        
+        if (checkers.length > 1){   // two checkers
+            console.log(`Double check:  ${squareArr[square]} at ${square} must move to relieve check`);        
+            canKingMove(square, true)
+        } 
     }
     return rtnVal;
 }
 
-function canKingMove(square, path){
+function canKingMove(square, dire){     // square= location of King under check,  dire= King must move or DIE
 
-    console.log(`Double check:  ${squareArr[square]} at ${square} must move to relieve check`);
-    const target = [1, -1, 7, -7, 8, -8, 9, -9];
+    const target = [1, -1, 7, -7, 8, -8, 9, -9];    // moves for the King to try
     const validKingMoves = [];
     let canMove = false;
 
-    // what if king can kill attacker?????  
-    changePlayer();
-    target.forEach((move) => { if(validKing(square, square + move)) validKingMoves.push(square + move);});
-    // console.log("valid King Moves", validKingMoves);
-    const invalidKingMoves = path.hasEqualElements(validKingMoves);
+    changePlayer();     // opponent causes check, so change player to analyze potential king moves
+    target.forEach((move) => { if(validKing(square, square + move)) validKingMoves.push(square + move);});  // store valid moves
 
     for (const kingMove of validKingMoves) {
-        if (!invalidKingMoves.includes(kingMove)) {
-            let copySquareArr = JSON.parse(JSON.stringify(squareArr));
-            squareArr[square] = '';
-            squareArr[kingMove] = currentPlayer() + 'k';
-            if (!isInCheck(kingMove, opponent()).length) canMove = true;
-            // console.log(`King can move to square ${kingMove} : ${!isInCheck(kingMove, opponent())} `);
-            squareArr = copySquareArr;
-        }
+        let copySquareArr = JSON.parse(JSON.stringify(squareArr));
+        squareArr[square] = '';
+        squareArr[kingMove] = currentPlayer() + 'k';
+        if (!isInCheck(kingMove, opponent()).length) canMove = true;    // test valid King moves for self-checks
+        squareArr = copySquareArr;
     }
-    changePlayer();
-    return canMove;
-}
 
+    changePlayer();
+    if(!canMove && dire){ checkMate();}     // If King must move but can not... GAME OVER  
+    return canMove;                         // assumed King can not move, unless King has at least one safe square to move to
+}
 
 function compassCheck(square, attackerColour) {     // scan attack lines for Queen, Rook and Bishop
 
@@ -692,11 +713,7 @@ function compassCheck(square, attackerColour) {     // scan attack lines for Que
             if (squareArr[path] === attackerColour + piece || squareArr[path] === attackerColour + 'q') {   // is attacker present
                 // current player attacking, then check for check(s)
                 checks.push(checkLine);
-                // if(attackerColour==currentPlayer()){
-                //     console.log(`Can the ${attackerColour + squareArr[path].charAt(1)} at ${path} be killed?
-                //                 ${isInCheck(path,opponent(),squareArr)}`);
-                // }
-                console.log(`Oh Oh... ${squareArr[square]} is in cZech  by the ${attackerColour + squareArr[path].charAt(1)}`);
+                console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech  by the ${attackerColour + squareArr[path].charAt(1)}`);
                 rtnVal = checks;
                 break;
             }
@@ -708,23 +725,25 @@ function compassCheck(square, attackerColour) {     // scan attack lines for Que
 
 function pawnCheck(square, attackerColour) {  //REVISED REVISED
 
-    let rtnVal = undefined;
-
+    const checks= [];
     const defender = squareArr[square].charAt(0);
+
     if (defender == 'w') {
-        if (squareArr[square - 7] == 'bp' && file(square) != 8) rtnVal = [[square - 7]];     // bp attacking wk from NE
-        if (squareArr[square - 9] == 'bp' && file(square) != 1) rtnVal = [[square - 9]];     // bp attacking wk from NW
+        if (squareArr[square - 7] == 'bp' && file(square) != 8) checks.push( [square - 7] );     // bp attacking wk from NE
+        if (squareArr[square - 9] == 'bp' && file(square) != 1) checks.push( [square - 9] );     // bp attacking wk from NW
     }
     if (defender == 'b') {
-        if (squareArr[square + 7] == 'wp' && file(square) != 1) rtnVal = [[square + 7]];     // wp attacking bk from SW
-        if (squareArr[square + 9] == 'wp' && file(square) != 8) rtnVal = [[square + 9]];     // wp attacking bk from SE
+        if (squareArr[square + 7] == 'wp' && file(square) != 1) checks.push ( [square + 7] );     // wp attacking bk from SW
+        if (squareArr[square + 9] == 'wp' && file(square) != 8) checks.push ( [square + 9] );     // wp attacking bk from SE
     }
-    if (rtnVal !== undefined) console.log(`Oh Oh... ${squareArr[square]} is in cZech by the ${rtnVal < square ? 'bp' : 'wp'}`);
-    return rtnVal;
+    if (checks.length) console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${checks < square ? 'bp' : 'wp'}`);
+    
+    return checks;
 }
 
 function knightCheck(square, attackerColour) {             // scan hops of the knight
 
+    const checks= [];
     let rtnVal = undefined;
     const attackLines = [6, -6, 10, -10, 15, -15, 17, -17];     // hops measure the distance between king and knight
     for (let path of attackLines) {
@@ -732,31 +751,53 @@ function knightCheck(square, attackerColour) {             // scan hops of the k
         if (knightAt >= 1 && knightAt <= 64) {                      //prevent breach of border North and South
             if (getId(square).style.background != getId(knightAt).style.background) {     // knight moves to opposite square colour
                 if (squareArr[knightAt] == attackerColour + 'n') {                         // attacking knight found
-                    console.log(`Oh Oh... ${squareArr[square]} is in cZech by the ${attackerColour + squareArr[knightAt].charAt(1)}`);
-                    return [[knightAt]];
+                    console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${attackerColour + squareArr[knightAt].charAt(1)}`);
+                    checks.push([knightAt]);
                 }
             }
         }
     }
-    return rtnVal;
+    return checks;
 }
 
 Array.prototype.hasEqualElements = function (arr) {
 
     const equalElements = [];
-    for (outter of this) {
-        for (inner of arr) {
+    for (outter of this) {      // THIS= array preceding the method call.. example...  THIS.hasEqualElements(otherArray)
+        for (inner of arr) {    // other array
             if (inner === outter) {
-                if (!equalElements.includes(inner)) {
+                if (!equalElements.includes(inner)) {   // (! includes) avoids duplication of equal elements listed multiple times
                     equalElements.push(inner);
                 }
             }
         }
     }
-    if (equalElements.length) {
-        // console.table(equalElements);
-        return equalElements;
-    }
+    if (equalElements.length) return equalElements;  //BUG no IF, just return
+}
+
+function canEnPassantRemoveCheck(square, attackerColour){   // square= pawn checking the King, attackerColour is colour of checking pawn
+    
+    //TEST KING SAFETY not needed right??????
+    //TEST BORDER CONTROL ******************** is file right ??
+
+    let canRemove= false;
+    const enPassant= attackerColour=='w'? 'bp': 'wp';                       // the enPassant pawn beside attacker is opposite colour
+    if( (squareArr[square+1]== enPassant && file(square) !=8)               // check for enPassant pawn to the right with right border control
+        || (squareArr[square-1]== enPassant && file(square) !=1) ){         // check for enPassant pawn to the left with left border control
+            if( (enPassant.startsWith('w') && wPassant.move== moves.length) // enPassant only possible if the move was this round
+                || enPassant.startsWith('b') && bPassant.move==moves.length ){                
+                console.log('EnPassant possible');
+                canRemove= true;
+            }
+    } 
+    return canRemove;   // return false unless enPassant conditions were met
+}
+
+function checkMate(){
+    const squares = document.querySelectorAll('.square');
+    soundAlert('checkMate');
+    console.log(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `);
+    squares.forEach(square => square.classList.add('disabled'));        // provide a disabled look to board during promotion selection
 }
 
 // ************ Executable Code **************** //
@@ -767,4 +808,4 @@ setWidth("60px");
 setColumns(columns);
 printBoard(columns);
 
-// both validKnight() and valideKing() can return nothing and leave an undefined value for rtnVal in validMove()
+// both validKnight() and validKing() can return nothing and leave an undefined value for rtnVal in validMove()
