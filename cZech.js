@@ -7,6 +7,7 @@
 /*           https://pixabay.com/sound-effects/knocking-on-the-board-158172/                    */
 /*           https://pixabay.com/sound-effects/success-fanfare-trumpets-6185/                   */
 /*           https://pixabay.com/sound-effects/goodresult-82807/                                */
+/*           https://pixabay.com/sound-effects/low-no-82600/                                    */
 /*                                                                                              */
 /*  Images:  https://commons.wikimedia.org/wiki/Category:PNG_chess_pieces/Standard_transparent  */
 /*                                                                                              */
@@ -253,10 +254,41 @@ function move(from, to, piece) {
 
     soundAlert('valid');
     moves.push({ 'piece': pieceAt(to), 'rank': rank(to), 'file': file(to) });     // record moves, especially for passant sake
-    getId('board').dataset.player = getId('board').dataset.player === 'white' ? 'black' : 'white';  // change player
+    if(moves.length >20) isStalemate();
+
+    changePlayer();
     setMousePointer(getId('board').dataset.player);
 
-    // const check= isCheck(to);
+}
+
+function isStalemate(){
+    
+    let pieces= [];
+    const squares= document.querySelectorAll('.square');
+    const kingAt= squareArr.indexOf(opponent() +'k');
+    const canMove= canKingMove(kingAt, false);
+    const staleMate= () => {
+        soundAlert('staleMate');
+        console.log(`${formatColour(opponent())} King has no where to go... That's a stalemate!`);
+        squares.forEach(square => square.classList.add('disabled'));    // provide a disabled look to board during promotion selection
+    }
+    
+    if(canMove) return;
+    squares.forEach( ele =>  { if(playerAt(ele.id)== opponent()) {pieces.push(ele.id)} });
+    if(pieces.length == 1 && !canMove) {staleMate();}
+        // soundAlert('staleMate');
+        // console.log(`${formatColour(opponent())} King has no where to go... That's a stalemate!`);
+        // squares.forEach(square => square.classList.add('disabled'));    // provide a disabled look to board during promotion selection
+    
+    if(pieces.length >1 && !canMove){
+        for(const piece of pieces){
+            if(pieceAt(piece)== 'k') continue;
+                if(canPieceMove(Number(piece), opponent())) return;
+        }
+    }
+    // console.log(`${formatColour(opponent())} pieces(${pieces.length}): ${pieces}`);
+    // console.log(`Can ${opponent() +'k'} move: ${canMove}`);
+    staleMate();
 }
 
 function formatColour(colour) {
@@ -312,6 +344,13 @@ function soundAlert(soundType) {
             checkSound.play();
             break;
 
+        case 'staleMate':
+            const staleMateSound = new Audio('assets/sounds/staleMate.mp3');
+            staleMateSound.volume = 0.5;
+            staleMateSound.play();
+            break;
+    
+
         case 'checkMate':
             const checkMateSound = new Audio('assets/sounds/checkMate.mp3');
             checkMateSound.volume = 0.5;
@@ -325,6 +364,8 @@ function soundAlert(soundType) {
 function validPawn(from, to) {
 
     let valid = false;
+    
+    if(to < 1 || to > 64) return false;
     if (playerAt(from) == 'w') {
 
         if ((from - to == 7 && from % 8 != 0 && playerAt(to) == 'b') ||    // white attacks black NorthWest or NorthEast
@@ -381,6 +422,7 @@ function validPawn(from, to) {
 
 function validRook(from, to) {        // probably don't need to check if to is empty
 
+    if(to < 1 || to > 64) return false;
     if (file(from) == file(to)) {                                  // moving North or South
         if (from > to) {
             for (let path = from - 8; path >= to + 8; path -= 8) {        // scan North between from and to
@@ -419,6 +461,7 @@ function validRook(from, to) {        // probably don't need to check if to is e
 
 function validBishop(from, to) {      // probably don't need to check if to is empty
 
+    if(to < 1 || to > 64) return false;
     if (from % 9 == to % 9) {                                       // moving NorthWest or SouthEast
         if (from > to && file(from) != 1) {
             for (let path = from - 9; path >= to + 9; path -= 9) {       // scan NorthWest between from and to
@@ -458,6 +501,8 @@ function validBishop(from, to) {      // probably don't need to check if to is e
 function validKnight(from, to) {
 
     const target = Math.abs(from - to);      // scan target squares only,  6,-6, 10,-10, 15,-15, 17,-17
+    
+    if(to < 1 || to > 64) return false;
     switch (target) {                       // knight hops, no actual path
         case 6:
         case 10:
@@ -471,6 +516,7 @@ function validKnight(from, to) {
 }
 
 function validQueen(from, to) {       // Queen mimics bishop and rook validation
+    
     if (validBishop(from, to) || validRook(from, to)) { return true; }
     return false;
 }
@@ -562,7 +608,6 @@ function validMove(from, to, piece) {
     if (!rtnVal) return false;
 
 
-    /// RESET PASSANT PROPERTIES EACH MOVE NEEDED ???? MOVE IS UNIQUE
     /// WHAT ABOUT PROMOTION SIMULATION ?????????????
     let copySquareArr = JSON.parse(JSON.stringify(squareArr));
     squareArr[from] = '';
@@ -618,49 +663,79 @@ function isInCheck(square, attackerColour) {
             })
         });
     });
+    
     rtnVal= checkers;
+    if(checkers.length==0) return checkers;
 
-    if (checks.length && calledFrom == 'check') {  // subsequent conditions are looking for mate against opponent
-        
-        let isMate= true;
-        if (checkers.length == 1) {     // one checker
+    if (calledFrom == 'check') {  // subsequent conditions are looking for mate against opponent 
+
+        if(canKingMove(square,false)) return checkers;
+
+        if (checkers.length == 2){   // two checkers
+            console.log(`Double check:  ${squareArr[square]} at ${square} must move to relieve check`);        
+            canKingMove(square, true)
+            return checkers;
+        } 
+
+        if (checkers.length == 1) {     // one checker  // BUG - if not needed
 
             let canRemove= false;            
             const checkRemovers= isInCheck(checkers[0], opponent());    // squares that can remove the Knight
 
-            if(checkRemovers.length){                                   // if removal of check exist
+            if(checkRemovers.length){                                   // if removal of check exists
                 console.log(`who can remove check? ${checkRemovers}`);
                 for (const remover of checkRemovers) {                  // for each remover, copy board, simulate removal, change player
                     let copySquareArr = JSON.parse(JSON.stringify(squareArr));
                     squareArr[checkers[0]] = squareArr[remover];
                     squareArr[remover] = '';
                     changePlayer();
-                    let kingAt= squareArr.indexOf(currentPlayer() +'k');
-                    if (!isInCheck(kingAt, opponent()).length) canRemove = true;   //  self-check after removal, change player, restore board
+                    let kingAt= squareArr.indexOf(currentPlayer() +'k');            // locatiion of King under check
+                    if (!isInCheck(kingAt, opponent()).length) canRemove = true;    //  self-check after removal, change player, restore board
                     changePlayer();
                     squareArr= copySquareArr;
-                    if(canRemove) break;    // no self-check upon removal of checker, break loop
+                    if(canRemove) return checkers;  // no self-check upon removal of checker, break loop
                 }
-
-                // MOVE THIS IN THE ELSE BELOW ???????????????????????????
-                if(!canRemove){
-                    if(!canKingMove(square, false)){
-                        if(pieceAt(checkers[0])== 'n' || pieceAt(checkers[0])=='p') checkMate();
-                    } else {
-                        // canBlock()
-                    }
-                }    // if removal causes self-check, King must move-> Knights can't be blocked
             }
-            else{
-                if(pieceAt(checkers[0])== 'p') canRemove= canEnPassantRemoveCheck(checkers[0], attackerColour)
-                
-                canKingMove(square, true) }
+
+            // checkRemovers ignores enPassant, if checker is a pawn, send checker square to canEnPassantRemoveCheck()
+            if(pieceAt(checkers[0])== 'p'){
+                if(canEnPassantRemoveCheck(checkers[0], attackerColour)) return checkers;
+            }
+
+            // checker is pawn or knight and can't be removed, King must move
+            if(pieceAt(checkers[0])== 'p' || pieceAt(checkers[0])=='n' || path.length== 0){
+                canKingMove(square,true);   // we know King cant move already... hmmmm
+                return checkers;
+            }
+
+            if(path.length){
+                let canBlock = false;                
+                for( sqr of path){
+
+                    //  pretend sqr is currentKing to find pieces to fill the square
+                    const blockers= isInCheck(sqr, opponent());
+                    let offset= currentPlayer()=='w'? -8: 8;
+
+                    if(squareArr[sqr +offset]== opponent() +'p') blockers.push(sqr +offset);
+                    if(blockers.length){
+                        for(block of blockers){
+                            console.log(`square: ${sqr} can be blocked by ${block}`)
+                            let copySquareArr = JSON.parse(JSON.stringify(squareArr));
+                            squareArr[sqr] = squareArr[block];
+                            squareArr[block] = '';
+                            let kingAt= squareArr.indexOf(opponent() +'k');            // locatiion of currentPlayer King
+                            if (!isInCheck(kingAt, currentPlayer()).length) canBlock = true;    //  self-check after block and restore board
+                            squareArr= copySquareArr;
+                            if(canBlock){
+                                console.log('we have a blocker');
+                                return checkers;   // no self-check after blocker moves, exit function
+                            }
+                        }
+                    }
+                }
+                if(!canBlock) checkMate();
+            }                
         }
-        
-        if (checkers.length > 1){   // two checkers
-            console.log(`Double check:  ${squareArr[square]} at ${square} must move to relieve check`);        
-            canKingMove(square, true)
-        } 
     }
     return rtnVal;
 }
@@ -760,19 +835,52 @@ function knightCheck(square, attackerColour) {             // scan hops of the k
     return checks;
 }
 
-Array.prototype.hasEqualElements = function (arr) {
+function canPieceMove(from, colour){
+  
+    let path;
+    switch(pieceAt(from)){
 
-    const equalElements = [];
-    for (outter of this) {      // THIS= array preceding the method call.. example...  THIS.hasEqualElements(otherArray)
-        for (inner of arr) {    // other array
-            if (inner === outter) {
-                if (!equalElements.includes(inner)) {   // (! includes) avoids duplication of equal elements listed multiple times
-                    equalElements.push(inner);
-                }
-            }
+      case 'p': 
+        if(colour =='w') {path= [-7,-8,-9];}
+        else {path= [7,8,9];}
+        for(const direction of path){
+            if(validPawn(from, from + Number(direction))) return true;
+        }        
+        break;
+        
+      case 'q':
+        path= [-1,1,-7,7,-9,9,-8,8];
+        for(const direction of path){
+            if(validQueen(from, from + Number(direction))) return true;
         }
+        break;
+      
+      case 'b':
+        path= [-9,9,-7,7];
+        for(const direction of path){
+            if(validBishop(from, from +Number(direction))) return true;
+        }
+        break;
+      
+      case 'r':
+        path = [-1,1,-8,8];
+        for(const direction of path){
+            if(validRook(from, from + Number(direction))) return true;
+        }
+        break;
+      
+      case 'n':
+        path= [-6,6,-10,10,-15,15,-17,17];
+        for(const direction of path){
+            if(validKnight(from, from + Number(direction))) return true;
+        }
+        break;
+      
+      default:
+        console.log('testing moves for unknown piece.  Lionel Ritchie');
+        break;
     }
-    if (equalElements.length) return equalElements;  //BUG no IF, just return
+    return false;
 }
 
 function canEnPassantRemoveCheck(square, attackerColour){   // square= pawn checking the King, attackerColour is colour of checking pawn
@@ -800,6 +908,21 @@ function checkMate(){
     squares.forEach(square => square.classList.add('disabled'));        // provide a disabled look to board during promotion selection
 }
 
+Array.prototype.hasEqualElements = function (arr) {
+
+    const equalElements = [];
+    for (outter of this) {      // THIS= array preceding the method call.. example...  THIS.hasEqualElements(otherArray)
+        for (inner of arr) {    // other array
+            if (inner === outter) {
+                if (!equalElements.includes(inner)) {   // (! includes) avoids duplication of equal elements listed multiple times
+                    equalElements.push(inner);
+                }
+            }
+        }
+    }
+    if (equalElements.length) return equalElements;  //BUG no IF, just return
+}
+
 // ************ Executable Code **************** //
 // ********************************************* //
 
@@ -809,3 +932,4 @@ setColumns(columns);
 printBoard(columns);
 
 // both validKnight() and validKing() can return nothing and leave an undefined value for rtnVal in validMove()
+// WHAT ABOUT PROMOTION SIMULATION ?????????????
