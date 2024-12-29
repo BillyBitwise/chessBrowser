@@ -21,7 +21,7 @@ let squareArr = [true,
     "", "", "", "", "", "", "", "",
     "", "", "", "", "", "", "", "",
     "wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp",
-    "wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr"];
+    "wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr" ];
 
 
 function Lionel() { console.log("Hello! Is it me you're looking for?"); }
@@ -38,6 +38,7 @@ let changePlayer = () => getId('board').dataset.player = currentPlayer() == 'w' 
 let opponent = () => currentPlayer() == 'w' ? 'b' : 'w';
 let playerAt = (where) => squareArr[where].charAt(0);
 let pieceAt = (where) => squareArr[where].charAt(1);
+let mate = false;
 
 const moves = [];
 const columns = 8;
@@ -182,7 +183,6 @@ function clickEvent() {
     if (found && this.id != found) {              // your second click is your own piece... therefore selection change
         getId(found).classList.toggle("clicked");
         this.classList.toggle("clicked");
-
     }
 }
 
@@ -217,14 +217,14 @@ function move(from, to, piece) {
 
     // passant requires explicit removal of defender, unlike every other attack
     if (getId('board').dataset.player == 'black') {
-        if (bPassant.move == moves.length - 1 && bPassant.passant == true) {      // is black passant current
+        if (bPassant.move == moves.length - 1 && bPassant.passant && to== wPassant.where +8 && pieceAt(to)== 'p') {      // is black passant current
             printSquare(bPassant.where, "");
             bPassant.where = 0; bPassant.move = 0; bPassant.passant = false;
         }
     }
     // passant requires explicit removal of defender, unlike every other attack
     if (getId('board').dataset.player == 'white') {
-        if (wPassant.move == moves.length - 1 && wPassant.passant == true) {      // is white passant current
+        if (wPassant.move == moves.length - 1 && wPassant.passant && to== wPassant.where -8 && pieceAt(to)== 'p' ) {      // is white passant current
             printSquare(wPassant.where, "");
             wPassant.where = 0; wPassant.move = 0; wPassant.passant = false;
         }
@@ -254,41 +254,78 @@ function move(from, to, piece) {
 
     soundAlert('valid');
     moves.push({ 'piece': pieceAt(to), 'rank': rank(to), 'file': file(to) });     // record moves, especially for passant sake
-    if(moves.length >20) isStalemate();
+    if(mate) return;
 
+    if(moves.length >20){
+        if(isStaleMate()) return;
+        if(isDraw()) return;
+    }     
     changePlayer();
     setMousePointer(getId('board').dataset.player);
-
 }
 
-function isStalemate(){
+function isStaleMate(){
     
     let pieces= [];
     const squares= document.querySelectorAll('.square');
     const kingAt= squareArr.indexOf(opponent() +'k');
     const canMove= canKingMove(kingAt, false);
-    const staleMate= () => {
+    const staleMateMsg= `${formatColour(opponent())} King has no where to go... That's a stalemate!` 
+    const staleMate= (msg) => {
         soundAlert('staleMate');
-        console.log(`${formatColour(opponent())} King has no where to go... That's a stalemate!`);
+        console.log(msg);
         squares.forEach(square => square.classList.add('disabled'));    // provide a disabled look to board during promotion selection
+        return true;
     }
     
-    if(canMove) return;
-    squares.forEach( ele =>  { if(playerAt(ele.id)== opponent()) {pieces.push(ele.id)} });
-    if(pieces.length == 1 && !canMove) {staleMate();}
-        // soundAlert('staleMate');
-        // console.log(`${formatColour(opponent())} King has no where to go... That's a stalemate!`);
-        // squares.forEach(square => square.classList.add('disabled'));    // provide a disabled look to board during promotion selection
-    
+    if(canMove) return false;
+    squares.forEach( ele =>  { if(playerAt(ele.id)== opponent()) pieces.push(Number(ele.id)); });
+
+    if(pieces.length == 1 && !canMove) { staleMate(staleMateMsg); }    
     if(pieces.length >1 && !canMove){
         for(const piece of pieces){
             if(pieceAt(piece)== 'k') continue;
-                if(canPieceMove(Number(piece), opponent())) return;
+            if(canPieceMove(piece, opponent())) return false;
         }
+        staleMate(staleMateMsg);
+    }    
+}
+
+function isDraw(){
+    
+    let currentPieces= [];
+    let opponentPieces= [];
+    const squares= document.querySelectorAll('.square');
+    const draw= (msg) => {
+        soundAlert('staleMate');
+        console.log(msg);
+        squares.forEach(square => square.classList.add('disabled'));    // provide a disabled look to board during promotion selection
+        return true;
     }
-    // console.log(`${formatColour(opponent())} pieces(${pieces.length}): ${pieces}`);
-    // console.log(`Can ${opponent() +'k'} move: ${canMove}`);
-    staleMate();
+
+    squares.forEach( ele =>  {
+        if(playerAt(ele.id)== currentPlayer()) currentPieces.push(Number(ele.id));
+        if(playerAt(ele.id)== opponent()) opponentPieces.push(Number(ele.id));
+    });
+
+    if(currentPieces.length== 1 && opponentPieces.length== 1) draw('Insufficient Material... King vs. King');
+    if(currentPieces.length==1 && opponentPieces.length==2){
+        if(opponentPieces.some( (piece) => pieceAt(piece)=='b')) draw('Insufficient Material... King and Bishop vs. King');
+        if(opponentPieces.some( (piece) => pieceAt(piece)=='n')) draw('Insufficient Material... King and Knight vs. King');
+    }    
+    if(opponentPieces.length==1 && currentPieces.length==2){
+        if(currentPieces.some( (piece) => pieceAt(piece)=='b')) draw('Insufficient Material... King and Bishop vs. King');
+        if(currentPieces.some( (piece) => pieceAt(piece)=='n')) draw('Insufficient Material... King and Knight vs. King');
+    }    
+    let comparePiece;
+    if(opponentPieces.length==2 && currentPieces.length==2){
+        for(let piece of opponentPieces) if(pieceAt(piece) != 'k') comparePiece= getId(piece).style.background;
+        for(let piece of currentPieces){
+             if(pieceAt(piece) != 'k'){
+                if(getId(piece).style.background== comparePiece) draw('Insufficient Material... King and Bishop vs. King and same Bishop');
+            }    
+        }
+    }                     
 }
 
 function formatColour(colour) {
@@ -612,8 +649,8 @@ function validMove(from, to, piece) {
     let copySquareArr = JSON.parse(JSON.stringify(squareArr));
     squareArr[from] = '';
     squareArr[to] = piece;
-    if( (wPassant.passant==true && wPassant.move== moves.length-1) 
-        || bPassant.passant==true && bPassant.move==moves.length-1){
+    if( (wPassant.passant && wPassant.move== moves.length-1 && wPassant.where== to+8 && pieceAt(to)== 'p') 
+        || (bPassant.passant && bPassant.move==moves.length-1 && bPassant.where== to-8 && pieceAt(to)== 'p') ){
             if(currentPlayer()=='w') {squareArr[to+8] = '';}
             else {squareArr[to-8] = '';}
     }
@@ -621,27 +658,25 @@ function validMove(from, to, piece) {
     const currentPlayerKing = squareArr.indexOf(currentPlayer() + 'k');
     const opponentKing = squareArr.indexOf(opponent() + 'k');
 
-    let selfCheck = isInCheck(currentPlayerKing, opponent()).length;
-    let check = isInCheck(opponentKing, currentPlayer()).length;
-
-    if (selfCheck) {
+    // SELF CHECK- verify that our valid move does not produce self-check
+    if(isInCheck(currentPlayerKing, opponent()).length){
         console.log("You can not place your king in peril");
-        rtnVal = false;
-    }
-    else { rtnVal = true; }
-    if (check && !selfCheck) { soundAlert('check') };
+        squareArr = copySquareArr;
+        return false;
+    }     
+    if(isInCheck(opponentKing, currentPlayer()).length) soundAlert('check');
 
-    if (from == 5) { castle.recordMove(1); castle.recordMove(8); }     // black king moved, disable castle
-    if (from == 61) { castle.recordMove(57); castle.recordMove(64); }    // white king moved, disable castle
-    if (castle.isRook(from)) { castle.recordMove(from); }             // rook moved, disable castle on this rook side
+    if (from == 5) { castle.recordMove(1); castle.recordMove(8); }      // black king moved, disable castle
+    if (from == 61) { castle.recordMove(57); castle.recordMove(64); }   // white king moved, disable castle
+    if (castle.isRook(from)) { castle.recordMove(from); }               // rook moved, disable castle on this rook side
 
     squareArr = copySquareArr;
-    return rtnVal;
+    return true;
 }
 
 // selfCheck-   square= currentKing,    attackerColour= opponent()
 // check-       square= oppenentKing,   attackerColour= currentPlayer()
-// square is usually a King, unless you want to know if a piece can be removed?
+// isInCheck-   can be applied to any piece (not just King) to identify attacks to that piece
 function isInCheck(square, attackerColour) {
 
     let rtnVal = [];
@@ -688,6 +723,9 @@ function isInCheck(square, attackerColour) {
                     let copySquareArr = JSON.parse(JSON.stringify(squareArr));
                     squareArr[checkers[0]] = squareArr[remover];
                     squareArr[remover] = '';
+                    
+                    // KingAt was reading -1 
+
                     changePlayer();
                     let kingAt= squareArr.indexOf(currentPlayer() +'k');            // locatiion of King under check
                     if (!isInCheck(kingAt, opponent()).length) canRemove = true;    //  self-check after removal, change player, restore board
@@ -699,6 +737,7 @@ function isInCheck(square, attackerColour) {
 
             // checkRemovers ignores enPassant, if checker is a pawn, send checker square to canEnPassantRemoveCheck()
             if(pieceAt(checkers[0])== 'p'){
+                console.log("I'm not executing")
                 if(canEnPassantRemoveCheck(checkers[0], attackerColour)) return checkers;
             }
 
@@ -906,6 +945,7 @@ function checkMate(){
     soundAlert('checkMate');
     console.log(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `);
     squares.forEach(square => square.classList.add('disabled'));        // provide a disabled look to board during promotion selection
+    mate= true;
 }
 
 Array.prototype.hasEqualElements = function (arr) {
