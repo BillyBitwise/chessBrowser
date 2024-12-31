@@ -15,11 +15,61 @@
 
 body{ background:#bbb; padding: 20px 40px;}
 
+#container{
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
 #board{
     width:  var(--totWidth);
     height: var(--totWidth);
     border: solid var(--boardClr) var(--bord);
     background: black;
+}
+
+#moveMessage{
+    margin: 95px 0 15px 0;
+    width: 230px;
+    height: 80px;
+    padding: 10px;
+    border: solid #555 8px;
+    background: #aaa
+}
+
+#moveHistory{
+    display:flex;
+    flex-wrap:wrap;
+    overflow: auto;
+    align-content: flex-start;
+    gap: 5px;
+    width: 230px;
+    height: 400px;
+    border: solid #555 8px;
+    padding: 10px;
+    background: #aaa;
+}
+
+#moveHistory > *{
+    display: flex;
+    flex: 0 0 60px;
+    align-items: center;
+    border: solid #777 5px;
+    justify-content: center;
+    box-sizing: border-box;
+    background: #ccc;
+    height: 40px;
+}
+
+.moveImg{
+    width: 25px;
+    height: 25px;
+}
+
+.moveContainer{
+    display:flex;
+    justify-content: center;
+    padding-right: 5px;
 }
 
 .square,
@@ -31,30 +81,16 @@ body{ background:#bbb; padding: 20px 40px;}
     vertical-align: top;
 }
 
-img{
-    margin:auto;
-    /* width: 25px;
-    height:25px; */
-}
-/* 
-.black:hover{
-    border: solid pink var(--bord);
-}
+img{ margin: auto;}
 
-.white:hover{
-    border: solid pink var(--bord);
-} */
-
-.clicked{
-    border:solid chocolate 4px;
-}
+.clicked{ border: solid chocolate 4px;}
 
 .current-player-pointer{
-    cursor:pointer;
+    cursor: pointer;
     background-color: red;
 }
 
 .disabled{
-    pointer-events:none;
+    pointer-events: none;
     opacity: 0.6;
 }
