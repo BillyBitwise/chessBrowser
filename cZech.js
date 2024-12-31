@@ -23,7 +23,6 @@ let squareArr = [true,
     "wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp",
     "wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr" ];
 
-
 function Lionel() { console.log("Hello! Is it me you're looking for?"); }
 function getId(ele) { return document.getElementById(ele); }
 function setWidth(pxls) { r.style.setProperty('--sqWidth', pxls) }       // changes CSS variable in :root 
@@ -47,7 +46,6 @@ const bPassant = { 'where': 0, 'move': 0, 'passant': false };
 const promote = { from: 0, to: 0 };
 const r = document.querySelector(':root');
 const rs = getComputedStyle(r);
-
 
 const castle = {    // properties with numeric keys represent rook and king squares, values represent whether they have ever moved
     1: false, 57: false,
@@ -157,6 +155,29 @@ function printSquare(num, piece, ele) {
     if (ele === undefined) { squareArr[num] = piece; }                // ele will be undefined for board squares, but defined for promotion squares
 }
 
+function printMove(){
+    
+    const moveNo = document.createElement("div");
+    const moveContainer = document.createElement("div");
+    const moveImg = document.createElement("img");
+    const moveNotation = document.createElement("div");
+ 
+    moveNo.innerHTML= Math.ceil(moves.length /2);
+    moveNotation.innerHTML= moves[moves.length-1].notation;
+    moveImg.classList="moveImg";
+    moveImg.src = "assets/images/" + moves[moves.length-1].piece + ".png";
+
+    moveContainer.classList= "moveContainer"; 
+    moveContainer.appendChild(moveImg);
+    moveContainer.appendChild(moveNotation);
+
+    if(moves.length%2) getId('moveHistory').appendChild(moveNo);
+    getId('moveHistory').appendChild(moveContainer);
+    getId('moveHistory').scrollTop = getId('moveHistory').scrollHeight;
+
+}
+
+
 function clickEvent() {
 
     let found = 0;      // use as value and boolean
@@ -230,7 +251,7 @@ function move(from, to, piece) {
         }
     }
 
-    if (piece.charAt(1) == 'k' && Math.abs(from - to) == 2) {      // has the king Castled
+    if (piece.charAt(1) == 'k' && Math.abs(from - to) == 2) {   // has the king Castled
         if (piece.charAt(0) == 'w') {
             if (to == 59) {                                     // long castle white
                 printSquare(57, '');
@@ -253,7 +274,9 @@ function move(from, to, piece) {
     }
 
     soundAlert('valid');
-    moves.push({ 'piece': pieceAt(to), 'rank': rank(to), 'file': file(to) });     // record moves, especially for passant sake
+    moves.push({ piece: piece, notation: formatFile(file(to)) +rank(to) });     // record moves, especially for passant sake
+    printMove();
+    console.log(moves[moves.length-1]);
     if(mate) return;
 
     if(moves.length >20){
@@ -271,23 +294,17 @@ function isStaleMate(){
     const kingAt= squareArr.indexOf(opponent() +'k');
     const canMove= canKingMove(kingAt, false);
     const staleMateMsg= `${formatColour(opponent())} King has no where to go... That's a stalemate!` 
-    const staleMate= (msg) => {
-        soundAlert('staleMate');
-        console.log(msg);
-        squares.forEach(square => square.classList.add('disabled'));    // provide a disabled look to board during promotion selection
-        return true;
-    }
     
     if(canMove) return false;
     squares.forEach( ele =>  { if(playerAt(ele.id)== opponent()) pieces.push(Number(ele.id)); });
 
-    if(pieces.length == 1 && !canMove) { staleMate(staleMateMsg); }    
+    if(pieces.length == 1 && !canMove) { gameOver(staleMateMsg, 'staleMate'); }    
     if(pieces.length >1 && !canMove){
         for(const piece of pieces){
             if(pieceAt(piece)== 'k') continue;
             if(canPieceMove(piece, opponent())) return false;
         }
-        staleMate(staleMateMsg);
+        gameOver(staleMateMsg, 'staleMate');
     }    
 }
 
@@ -296,33 +313,27 @@ function isDraw(){
     let currentPieces= [];
     let opponentPieces= [];
     const squares= document.querySelectorAll('.square');
-    const draw= (msg) => {
-        soundAlert('staleMate');
-        console.log(msg);
-        squares.forEach(square => square.classList.add('disabled'));    // provide a disabled look to board during promotion selection
-        return true;
-    }
 
     squares.forEach( ele =>  {
         if(playerAt(ele.id)== currentPlayer()) currentPieces.push(Number(ele.id));
         if(playerAt(ele.id)== opponent()) opponentPieces.push(Number(ele.id));
     });
 
-    if(currentPieces.length== 1 && opponentPieces.length== 1) draw('Insufficient Material... King vs. King');
+    if(currentPieces.length== 1 && opponentPieces.length== 1) gameOver('Insufficient Material... King vs. King', 'staleMate');
     if(currentPieces.length==1 && opponentPieces.length==2){
-        if(opponentPieces.some( (piece) => pieceAt(piece)=='b')) draw('Insufficient Material... King and Bishop vs. King');
-        if(opponentPieces.some( (piece) => pieceAt(piece)=='n')) draw('Insufficient Material... King and Knight vs. King');
+        if(opponentPieces.some( (piece) => pieceAt(piece)=='b')) gameOver('Insufficient Material... King and Bishop vs. King', 'staleMate');
+        if(opponentPieces.some( (piece) => pieceAt(piece)=='n')) gameOver('Insufficient Material... King and Knight vs. King', 'staleMate');
     }    
     if(opponentPieces.length==1 && currentPieces.length==2){
-        if(currentPieces.some( (piece) => pieceAt(piece)=='b')) draw('Insufficient Material... King and Bishop vs. King');
-        if(currentPieces.some( (piece) => pieceAt(piece)=='n')) draw('Insufficient Material... King and Knight vs. King');
+        if(currentPieces.some( (piece) => pieceAt(piece)=='b')) gameOver('Insufficient Material... King and Bishop vs. King', 'staleMate');
+        if(currentPieces.some( (piece) => pieceAt(piece)=='n')) gameOver('Insufficient Material... King and Knight vs. King', 'staleMate');
     }    
     let comparePiece;
     if(opponentPieces.length==2 && currentPieces.length==2){
         for(let piece of opponentPieces) if(pieceAt(piece) != 'k') comparePiece= getId(piece).style.background;
         for(let piece of currentPieces){
              if(pieceAt(piece) != 'k'){
-                if(getId(piece).style.background== comparePiece) draw('Insufficient Material... King and Bishop vs. King and same Bishop');
+                if(getId(piece).style.background== comparePiece) gameOver('Insufficient Material... King and Bishop vs. King and same Bishop', 'staleMate');
             }    
         }
     }                     
@@ -344,6 +355,21 @@ function formatType(type) {
     };
     return types[type] || '';
 }
+
+function formatFile(file) {
+    const files = {
+        '1': 'a',
+        '2': 'b',
+        '3': 'c',
+        '4': 'd',
+        '5': 'e',
+        '6': 'f',
+        '7': 'g',
+        '8': 'h'
+    };
+    return files[file] || '';
+}
+
 
 function setMousePointer(colour) {
     const squares = document.querySelectorAll('.square');
@@ -640,7 +666,7 @@ function validMove(from, to, piece) {
         case 'q': rtnVal = validQueen(from, to); break;
         case 'b': rtnVal = validBishop(from, to); break;
         case 'n': rtnVal = validKnight(from, to); break;
-        default: console.log('Validate unknown piece'); break;
+        default: console.log('ValidateMove() found unknown piece'); break;
     }
     if (!rtnVal) return false;
 
@@ -737,7 +763,6 @@ function isInCheck(square, attackerColour) {
 
             // checkRemovers ignores enPassant, if checker is a pawn, send checker square to canEnPassantRemoveCheck()
             if(pieceAt(checkers[0])== 'p'){
-                console.log("I'm not executing")
                 if(canEnPassantRemoveCheck(checkers[0], attackerColour)) return checkers;
             }
 
@@ -758,7 +783,7 @@ function isInCheck(square, attackerColour) {
                     if(squareArr[sqr +offset]== opponent() +'p') blockers.push(sqr +offset);
                     if(blockers.length){
                         for(block of blockers){
-                            console.log(`square: ${sqr} can be blocked by ${block}`)
+                            // console.log(`square: ${sqr} can be blocked by ${block}`)
                             let copySquareArr = JSON.parse(JSON.stringify(squareArr));
                             squareArr[sqr] = squareArr[block];
                             squareArr[block] = '';
@@ -766,13 +791,13 @@ function isInCheck(square, attackerColour) {
                             if (!isInCheck(kingAt, currentPlayer()).length) canBlock = true;    //  self-check after block and restore board
                             squareArr= copySquareArr;
                             if(canBlock){
-                                console.log('we have a blocker');
+                                // console.log('we have a blocker');
                                 return checkers;   // no self-check after blocker moves, exit function
                             }
                         }
                     }
                 }
-                if(!canBlock) checkMate();
+                if(!canBlock) gameOver(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `, 'checkMate');
             }                
         }
     }
@@ -797,7 +822,7 @@ function canKingMove(square, dire){     // square= location of King under check,
     }
 
     changePlayer();
-    if(!canMove && dire){ checkMate();}     // If King must move but can not... GAME OVER  
+    if(!canMove && dire){ gameOver(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `, 'checkMate');}     // If King must move but can not... GAME OVER  
     return canMove;                         // assumed King can not move, unless King has at least one safe square to move to
 }
 
@@ -827,7 +852,7 @@ function compassCheck(square, attackerColour) {     // scan attack lines for Que
             if (squareArr[path] === attackerColour + piece || squareArr[path] === attackerColour + 'q') {   // is attacker present
                 // current player attacking, then check for check(s)
                 checks.push(checkLine);
-                console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech  by the ${attackerColour + squareArr[path].charAt(1)}`);
+                // console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech  by the ${attackerColour + squareArr[path].charAt(1)}`);
                 rtnVal = checks;
                 break;
             }
@@ -850,7 +875,7 @@ function pawnCheck(square, attackerColour) {  //REVISED REVISED
         if (squareArr[square + 7] == 'wp' && file(square) != 1) checks.push ( [square + 7] );     // wp attacking bk from SW
         if (squareArr[square + 9] == 'wp' && file(square) != 8) checks.push ( [square + 9] );     // wp attacking bk from SE
     }
-    if (checks.length) console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${checks < square ? 'bp' : 'wp'}`);
+    // if (checks.length) console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${checks < square ? 'bp' : 'wp'}`);
     
     return checks;
 }
@@ -865,7 +890,7 @@ function knightCheck(square, attackerColour) {             // scan hops of the k
         if (knightAt >= 1 && knightAt <= 64) {                      //prevent breach of border North and South
             if (getId(square).style.background != getId(knightAt).style.background) {     // knight moves to opposite square colour
                 if (squareArr[knightAt] == attackerColour + 'n') {                         // attacking knight found
-                    console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${attackerColour + squareArr[knightAt].charAt(1)}`);
+                    // console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${attackerColour + squareArr[knightAt].charAt(1)}`);
                     checks.push([knightAt]);
                 }
             }
@@ -933,19 +958,17 @@ function canEnPassantRemoveCheck(square, attackerColour){   // square= pawn chec
         || (squareArr[square-1]== enPassant && file(square) !=1) ){         // check for enPassant pawn to the left with left border control
             if( (enPassant.startsWith('w') && wPassant.move== moves.length) // enPassant only possible if the move was this round
                 || enPassant.startsWith('b') && bPassant.move==moves.length ){                
-                console.log('EnPassant possible');
+                console.log('EnPassant can relieve Check');
                 canRemove= true;
             }
     } 
     return canRemove;   // return false unless enPassant conditions were met
 }
-
-function checkMate(){
+function gameOver(msg, sound){
     const squares = document.querySelectorAll('.square');
-    soundAlert('checkMate');
-    console.log(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `);
     squares.forEach(square => square.classList.add('disabled'));        // provide a disabled look to board during promotion selection
-    mate= true;
+    soundAlert(sound);
+    console.log(msg);
 }
 
 Array.prototype.hasEqualElements = function (arr) {
