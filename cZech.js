@@ -10,18 +10,24 @@
 /*           https://pixabay.com/sound-effects/low-no-82600/                                    */
 /*                                                                                              */
 /*  Images:  https://commons.wikimedia.org/wiki/Category:PNG_chess_pieces/Standard_transparent  */
+/*           https://fonts.google.com/icons?selected=Material+Symbols+Outlined:chevron_backward */
+/*           https://fonts.google.com/icons?selected=Material+Symbols+Outlined:chevron_forward  */
+/*           https://fonts.google.com/icons?selected=Material+Symbols+Outlined:first_page       */
+/*           https://fonts.google.com/icons?selected=Material+Symbols+Outlined:last_page        */
 /*                                                                                              */
 /************************************************************************************************/
 
 let squareArr = [true,
-    "br", "bn", "bb", "bq", "bk", "bb", "bn", "br",
-    "bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp",
-    "", "", "", "", "", "", "", "",
-    "", "", "", "", "", "", "", "",
-    "", "", "", "", "", "", "", "",
-    "", "", "", "", "", "", "", "",
-    "wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp",
-    "wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr" ];
+    'br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br',
+    'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
+    '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '',
+    'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
+    'wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr' ];
+let newBoard= [...squareArr];
+squareArr[0]=[...squareArr];
 
 function Lionel() { console.log("Hello! Is it me you're looking for?"); }
 function getId(ele) { return document.getElementById(ele); }
@@ -61,13 +67,12 @@ function printBoard(cols) {
     // build board element with 64 child square elements
     // initialize player and round in board element
     // declare a 'click event' for each square element
-
-    const board = getId("board");
-    board.setAttribute('data-player', 'white');
     let i = 1;
     let row = 1;
+    const board = getId("board");
 
     board.innerHTML = "";
+    board.setAttribute('data-player', 'white');
     while (i <= cols ** 2) {
         const square = document.createElement("div");
         square.classList = "square";
@@ -90,10 +95,12 @@ function printBoard(cols) {
         }
         i++;  // next square
     }
-    for (let i = 1; i <= squareArr.length - 1; i++) { printSquare(i, squareArr[i]); }
-    setMousePointer(getId("board").dataset.player);
+    
+    for (let i = 1; i <= squareArr.length - 1; i++)  printSquare(i, squareArr[i]); 
     printPromote('w');
     printPromote('b');
+    setMousePointer(getId("board").dataset.player);
+    moves.push({piece:'',notation:'', board: [...squareArr]});
 }
 
 //   fill divs above and below board with promotion pieces, then hide them
@@ -162,19 +169,19 @@ function printMove(){
     const moveImg = document.createElement("img");
     const moveNotation = document.createElement("div");
  
-    moveNo.innerHTML= Math.ceil(moves.length /2);
-    moveNotation.innerHTML= moves[moves.length-1].notation;
+    moveNo.classList= "moveNo";
+    moveNo.innerHTML= Math.ceil(moves.length /2);           // moves[0] is starter position, so moves[3] completes round 1
+    moveNotation.innerHTML= moves[moves.length-1].notation; // notation property from last element of move array
     moveImg.classList="moveImg";
     moveImg.src = "assets/images/" + moves[moves.length-1].piece + ".png";
 
     moveContainer.classList= "moveContainer"; 
-    moveContainer.appendChild(moveImg);
-    moveContainer.appendChild(moveNotation);
+    moveContainer.appendChild(moveImg);         // add image first
+    moveContainer.appendChild(moveNotation);    // then add notation to the move container
 
-    if(moves.length%2) getId('moveHistory').appendChild(moveNo);
-    getId('moveHistory').appendChild(moveContainer);
-    getId('moveHistory').scrollTop = getId('moveHistory').scrollHeight;
-
+    if((moves.length+1)%2) getId('moveHistory').appendChild(moveNo);    // add line number first
+    getId('moveHistory').appendChild(moveContainer);                    // then add the move container to the move history container
+    getId('moveHistory').scrollTop = getId('moveHistory').scrollHeight; // move scroll bar to show the latest additions (the appends above)
 }
 
 
@@ -274,11 +281,11 @@ function move(from, to, piece) {
     }
 
     soundAlert('valid');
-    moves.push({ piece: piece, notation: formatFile(file(to)) +rank(to) });     // record moves, especially for passant sake
+    moves.push({ piece: piece, notation: formatFile(file(to)) +rank(to), board: [...squareArr] });     // record moves, especially for passant sake
     printMove();
-    console.log(moves[moves.length-1]);
-    if(mate) return;
+    getId('moveHistory').dataset.navIndex= moves.length -1;
 
+    if(mate) return;
     if(moves.length >20){
         if(isStaleMate()) return;
         if(isDraw()) return;
@@ -350,8 +357,8 @@ function formatType(type) {
         'r': 'rook',
         'n': 'knight',
         'b': 'bishop',
-        'q': 'queen',
-        'k': 'king'
+        'q': 'Queen',
+        'k': 'King'
     };
     return types[type] || '';
 }
@@ -750,8 +757,6 @@ function isInCheck(square, attackerColour) {
                     squareArr[checkers[0]] = squareArr[remover];
                     squareArr[remover] = '';
                     
-                    // KingAt was reading -1 
-
                     changePlayer();
                     let kingAt= squareArr.indexOf(currentPlayer() +'k');            // locatiion of King under check
                     if (!isInCheck(kingAt, opponent()).length) canRemove = true;    //  self-check after removal, change player, restore board
@@ -875,7 +880,11 @@ function pawnCheck(square, attackerColour) {  //REVISED REVISED
         if (squareArr[square + 7] == 'wp' && file(square) != 1) checks.push ( [square + 7] );     // wp attacking bk from SW
         if (squareArr[square + 9] == 'wp' && file(square) != 8) checks.push ( [square + 9] );     // wp attacking bk from SE
     }
-    // if (checks.length) console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${checks < square ? 'bp' : 'wp'}`);
+    if (checks.length)
+        getId('moveMessage').textContent=
+            `Oh Oh... ${formatColour(playerAt(square))} ${formatType(pieceAt(square))} \n
+             on ${formatFile(file(square))}${rank(square)} is in cZech by \n
+             the ${checks < square? formatColour('b'): formatColour('w')} pawn`;
     
     return checks;
 }
@@ -883,14 +892,13 @@ function pawnCheck(square, attackerColour) {  //REVISED REVISED
 function knightCheck(square, attackerColour) {             // scan hops of the knight
 
     const checks= [];
-    let rtnVal = undefined;
     const attackLines = [6, -6, 10, -10, 15, -15, 17, -17];     // hops measure the distance between king and knight
+
     for (let path of attackLines) {
         const knightAt = square + path;
         if (knightAt >= 1 && knightAt <= 64) {                      //prevent breach of border North and South
             if (getId(square).style.background != getId(knightAt).style.background) {     // knight moves to opposite square colour
                 if (squareArr[knightAt] == attackerColour + 'n') {                         // attacking knight found
-                    // console.log(`Oh Oh... ${squareArr[square]} at ${square} is in cZech by the ${attackerColour + squareArr[knightAt].charAt(1)}`);
                     checks.push([knightAt]);
                 }
             }
@@ -899,7 +907,7 @@ function knightCheck(square, attackerColour) {             // scan hops of the k
     return checks;
 }
 
-function canPieceMove(from, colour){
+function canPieceMove(from, colour){    // switch piece type- evaluate case for closest square in every direction the piece allows
   
     let path;
     switch(pieceAt(from)){
@@ -958,17 +966,71 @@ function canEnPassantRemoveCheck(square, attackerColour){   // square= pawn chec
         || (squareArr[square-1]== enPassant && file(square) !=1) ){         // check for enPassant pawn to the left with left border control
             if( (enPassant.startsWith('w') && wPassant.move== moves.length) // enPassant only possible if the move was this round
                 || enPassant.startsWith('b') && bPassant.move==moves.length ){                
-                console.log('EnPassant can relieve Check');
-                canRemove= true;
+                    getId('moveMessage').textContent+= 'EnPassant can relieve Check';
+                    canRemove= true;
             }
     } 
     return canRemove;   // return false unless enPassant conditions were met
 }
+
 function gameOver(msg, sound){
+
+    const navs = document.querySelectorAll('.navButton');
     const squares = document.querySelectorAll('.square');
+
     squares.forEach(square => square.classList.add('disabled'));        // provide a disabled look to board during promotion selection
     soundAlert(sound);
+    getId('moveMessage').textContent= msg;
     console.log(msg);
+
+    navs.forEach(nav => {   // each navigator button assigned event handler and cursor pointers
+        nav.addEventListener('mouseenter', () => nav.style.cursor='pointer');
+        nav.addEventListener('mouseleave', () => nav.style.cursor='pointer');
+        nav.addEventListener('click', (e) => moveHistory(e));
+    })
+}
+
+function moveHistory(e){        // switch event currentTarget id to adjust navigator index accordingly
+   
+    let board;
+    let indexMax= moves.length -1
+    let index=Number(getId('moveHistory').dataset.navIndex);
+    
+
+    console.log(e.currentTarget.id);
+    switch(e.currentTarget.id){
+        case 'first':
+            index= 0;
+            break;
+
+        case 'back':            
+            index= index==0? 0: index-1
+            break;
+
+        case 'forward':
+            index= index < indexMax? index +1: indexMax;     
+            break;
+
+        case 'last':
+            index= indexMax;
+            break;
+
+        default: console.log('nav button unknown');
+    }
+    
+    //  adjust navigator index  // set BOARD using the navigator index, to that element in moves array
+    board= moves[index].board;
+    getId('moveHistory').dataset.navIndex= index;
+    getId('moveMessage').textContent= `index: ${index}   max: ${indexMax}`;
+    
+    for(let i=1; i<65; i++){        // use our BOARD instance to reset and redraw each square
+        getId(i).innerHTML='';
+        if(board[i]=='') continue;    
+        
+        let img=document.createElement('img');
+        img.src= `assets/images/${board[i]}.png`; 
+        getId(i).appendChild(img);
+    }
 }
 
 Array.prototype.hasEqualElements = function (arr) {
