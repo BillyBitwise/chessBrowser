@@ -26,7 +26,7 @@ let squareArr = [true,
     '', '', '', '', '', '', '', '',
     'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
     'wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr' ];
-let newBoard= [...squareArr];
+let newBoard= [...squareArr];   //not used
 squareArr[0]=[...squareArr];
 
 function Lionel() { console.log("Hello! Is it me you're looking for?"); }
@@ -207,7 +207,7 @@ function clickEvent() {
         }
 
     if (!found || this.id == found)              // either first click OR second click is same as first
-    { this.classList.toggle("clicked"); }
+        { this.classList.toggle("clicked"); }
     if (found && this.id != found) {              // your second click is your own piece... therefore selection change
         getId(found).classList.toggle("clicked");
         this.classList.toggle("clicked");
@@ -247,14 +247,16 @@ function move(from, to, piece) {
     if (getId('board').dataset.player == 'black') {
         if (bPassant.move == moves.length - 1 && bPassant.passant && to== wPassant.where +8 && pieceAt(to)== 'p') {      // is black passant current
             printSquare(bPassant.where, "");
-            bPassant.where = 0; bPassant.move = 0; bPassant.passant = false;
+            bPassant.passant = false;
+            // bPassant.where = 0; bPassant.move = 0; bPassant.passant = false;
         }
     }
     // passant requires explicit removal of defender, unlike every other attack
     if (getId('board').dataset.player == 'white') {
         if (wPassant.move == moves.length - 1 && wPassant.passant && to== wPassant.where -8 && pieceAt(to)== 'p' ) {      // is white passant current
             printSquare(wPassant.where, "");
-            wPassant.where = 0; wPassant.move = 0; wPassant.passant = false;
+            wPassant.passant = false;
+            // wPassant.where = 0; wPassant.move = 0; wPassant.passant = false;
         }
     }
 
@@ -281,20 +283,22 @@ function move(from, to, piece) {
     }
 
     soundAlert('valid');
+    console.log("white Passant", wPassant.move, moves.length-1, );
+
+    if(moves.length >20 && !mate){
+        isStaleMate(to);
+        isDraw();
+    }     
+
     moves.push({ piece: piece, notation: formatFile(file(to)) +rank(to), board: [...squareArr] });     // record moves, especially for passant sake
     printMove();
     getId('moveHistory').dataset.navIndex= moves.length -1;
 
-    if(mate) return;
-    if(moves.length >20){
-        if(isStaleMate()) return;
-        if(isDraw()) return;
-    }     
     changePlayer();
     setMousePointer(getId('board').dataset.player);
 }
 
-function isStaleMate(){
+function isStaleMate(to){
     
     let pieces= [];
     const squares= document.querySelectorAll('.square');
@@ -311,6 +315,7 @@ function isStaleMate(){
             if(pieceAt(piece)== 'k') continue;
             if(canPieceMove(piece, opponent())) return false;
         }
+        if(pieceAt(to)=='p' && canEnPassant(to, currentPlayer()) ) return;
         gameOver(staleMateMsg, 'staleMate');
     }    
 }
@@ -376,7 +381,6 @@ function formatFile(file) {
     };
     return files[file] || '';
 }
-
 
 function setMousePointer(colour) {
     const squares = document.querySelectorAll('.square');
@@ -453,13 +457,13 @@ function validPawn(from, to) {
         }
         if ((from - to == 7 && from % 8 != 0 && rank(from) == 5                        // white wants en passant to the right
             && wPassant.where == from + 1 && wPassant.move == moves.length - 1)) {      // and black made it possible last move 
-            valid = true;
-            wPassant.passant = true;
+                valid = true;
+                wPassant.passant = true;
         }
         if ((from - to == 9 && from % 8 != 1 && rank(from) == 5                        // white wants en passant to the left
             && wPassant.where == from - 1 && wPassant.move == moves.length - 1)) {      // and black made it possible last move 
-            valid = true;
-            wPassant.passant = true;
+                valid = true;
+                wPassant.passant = true;
         }
     }
     else {
@@ -478,13 +482,13 @@ function validPawn(from, to) {
         }
         if ((from - to == -7 && from % 8 != 1 && rank(from) == 4                   // black wants en passant to the left
             && bPassant.where == from - 1 && bPassant.move == moves.length - 1)) {  // and white made it possible last move
-            valid = true;
-            bPassant.passant = true;
+                valid = true;
+                bPassant.passant = true;
         }
         if ((from - to == -9 && from % 8 != 0 && rank(from) == 4                   // black wants en passant to the right
             && bPassant.where == from + 1 && bPassant.move == moves.length - 1)) {  // and white made it possible last move
-            valid = true;
-            bPassant.passant = true;
+                valid = true;
+                bPassant.passant = true;
         }
     }
     return valid;
@@ -677,7 +681,6 @@ function validMove(from, to, piece) {
     }
     if (!rtnVal) return false;
 
-
     /// WHAT ABOUT PROMOTION SIMULATION ?????????????
     let copySquareArr = JSON.parse(JSON.stringify(squareArr));
     squareArr[from] = '';
@@ -740,7 +743,7 @@ function isInCheck(square, attackerColour) {
         if(canKingMove(square,false)) return checkers;
 
         if (checkers.length == 2){   // two checkers
-            console.log(`Double check:  ${squareArr[square]} at ${square} must move to relieve check`);        
+            console.log(`Double check:  ${squareArr[square]} at ${square} must move to relieve check`);                    
             canKingMove(square, true)
             return checkers;
         } 
@@ -766,9 +769,11 @@ function isInCheck(square, attackerColour) {
                 }
             }
 
-            // checkRemovers ignores enPassant, if checker is a pawn, send checker square to canEnPassantRemoveCheck()
+            // checkRemovers ignores enPassant, if checker is a pawn, send checker square to canEnPassant()
             if(pieceAt(checkers[0])== 'p'){
-                if(canEnPassantRemoveCheck(checkers[0], attackerColour)) return checkers;
+                if(canEnPassant(checkers[0], attackerColour)) return checkers;
+                mate=true;
+                gameOver(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate. No En Passant`, 'checkMate')
             }
 
             // checker is pawn or knight and can't be removed, King must move
@@ -784,8 +789,8 @@ function isInCheck(square, attackerColour) {
                     //  pretend sqr is currentKing to find pieces to fill the square
                     const blockers= isInCheck(sqr, opponent());
                     let offset= currentPlayer()=='w'? -8: 8;
-
                     if(squareArr[sqr +offset]== opponent() +'p') blockers.push(sqr +offset);
+
                     if(blockers.length){
                         for(block of blockers){
                             // console.log(`square: ${sqr} can be blocked by ${block}`)
@@ -880,12 +885,11 @@ function pawnCheck(square, attackerColour) {  //REVISED REVISED
         if (squareArr[square + 7] == 'wp' && file(square) != 1) checks.push ( [square + 7] );     // wp attacking bk from SW
         if (squareArr[square + 9] == 'wp' && file(square) != 8) checks.push ( [square + 9] );     // wp attacking bk from SE
     }
-    if (checks.length)
-        getId('moveMessage').textContent=
+    if (checks.length) { getId('moveMessage').textContent=
             `Oh Oh... ${formatColour(playerAt(square))} ${formatType(pieceAt(square))} \n
              on ${formatFile(file(square))}${rank(square)} is in cZech by \n
              the ${checks < square? formatColour('b'): formatColour('w')} pawn`;
-    
+    }
     return checks;
 }
 
@@ -916,8 +920,9 @@ function canPieceMove(from, colour){    // switch piece type- evaluate case for 
         if(colour =='w') {path= [-7,-8,-9];}
         else {path= [7,8,9];}
         for(const direction of path){
-            if(validPawn(from, from + Number(direction))) return true;
-        }        
+            // if(validPawn(from, from + Number(direction))) return true;
+            if(validMove(from, from + Number(direction), pieceAt(from))) return true;
+        }
         break;
         
       case 'q':
@@ -955,22 +960,42 @@ function canPieceMove(from, colour){    // switch piece type- evaluate case for 
     return false;
 }
 
-function canEnPassantRemoveCheck(square, attackerColour){   // square= pawn checking the King, attackerColour is colour of checking pawn
+function canEnPassant(square, attackerColour){   // square= pawn checking the King, attackerColour is colour of checking pawn
     
-    //TEST KING SAFETY not needed right??????
-    //TEST BORDER CONTROL ******************** is file right ??
+    let rtnVal = false;
+    let copySquareArr = JSON.parse(JSON.stringify(squareArr));
+    const enPassant= attackerColour=='w'? 'bp': 'wp';         // the enPassant pawn beside attacker is opposite colour
+    const to= enPassant.startsWith('w')? square -8: square +8;
 
-    let canRemove= false;
-    const enPassant= attackerColour=='w'? 'bp': 'wp';                       // the enPassant pawn beside attacker is opposite colour
-    if( (squareArr[square+1]== enPassant && file(square) !=8)               // check for enPassant pawn to the right with right border control
-        || (squareArr[square-1]== enPassant && file(square) !=1) ){         // check for enPassant pawn to the left with left border control
-            if( (enPassant.startsWith('w') && wPassant.move== moves.length) // enPassant only possible if the move was this round
-                || enPassant.startsWith('b') && bPassant.move==moves.length ){                
-                    getId('moveMessage').textContent+= 'EnPassant can relieve Check';
-                    canRemove= true;
-            }
-    } 
-    return canRemove;   // return false unless enPassant conditions were met
+    changePlayer();
+    const kingAt= squareArr.indexOf(currentPlayer() + 'k');  // defending King
+
+    if( (squareArr[square+1]== enPassant && file(square) !=8) // check for enPassant pawn to the right with right border control
+        && ( (enPassant.startsWith('w') && wPassant.move== moves.length) 
+            || (enPassant.startsWith('b') && bPassant.move==moves.length) ) ){                
+
+            squareArr[to]= squareArr[square +1];
+            squareArr[square +1]= '';
+            squareArr[square]= '';            
+            if(isInCheck(kingAt, opponent()).length) rtnVal= false;
+            // else rtnVal= true;
+            else return true;
+    }
+
+    if ( (squareArr[square-1]== enPassant && file(square) !=1)          // check for enPassant pawn to the left with left border control
+        && ( (enPassant.startsWith('w') && wPassant.move== moves.length) 
+            || (enPassant.startsWith('b') && bPassant.move==moves.length) ) ){                
+
+                squareArr[to]= squareArr[square-1];
+                squareArr[square-1]= '';
+                squareArr[square]= '';
+                if(isInCheck(kingAt, opponent()).length) rtnVal= false;
+                else rtnVal= true;
+    }
+    changePlayer();
+    squareArr=copySquareArr;
+    console.log("I checked for legal en Passant");
+    return rtnVal;
 }
 
 function gameOver(msg, sound){
