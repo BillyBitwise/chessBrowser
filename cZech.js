@@ -25,7 +25,7 @@ let squareArr = [true,
     '', '', '', '', '', '', '', '',
     '', '', '', '', '', '', '', '',
     'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
-    'wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr' ];
+    'wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr' ];    
 let newBoard= [...squareArr];   //not used
 squareArr[0]=[...squareArr];
 
@@ -35,7 +35,6 @@ function setWidth(pxls) { r.style.setProperty('--sqWidth', pxls) }       // chan
 function setColumns(c) { r.style.setProperty('--columns', c) }          // changes CSS variable in :root
 function rank(num) { return 9 - (Math.ceil(num / 8)); }
 function file(num) { return num % 8 ? num % 8 : 8; }
-function getId(ele) { return document.getElementById(ele); }
 function bgColour(ele, colour) { ele.style = (colour == "white") ? "background:#ddd" : "background:grey"; }
 
 let currentPlayer = () => getId('board').dataset.player.charAt(0);
@@ -100,7 +99,7 @@ function printBoard(cols) {
     printPromote('w');
     printPromote('b');
     setMousePointer(getId("board").dataset.player);
-    moves.push({piece:'',notation:'', board: [...squareArr]});
+    moves.push({piece:'', notation:'', board: [...squareArr]});
 }
 
 //   fill divs above and below board with promotion pieces, then hide them
@@ -170,7 +169,7 @@ function printMove(){
     const moveNotation = document.createElement("div");
  
     moveNo.classList= "moveNo";
-    moveNo.innerHTML= Math.ceil(moves.length /2);           // moves[0] is starter position, so moves[3] completes round 1
+    moveNo.innerHTML= Math.ceil(moves.length /2);           // moves[0] is starter position, so moves[2] completes round 1
     moveNotation.innerHTML= moves[moves.length-1].notation; // notation property from last element of move array
     moveImg.classList="moveImg";
     moveImg.src = "assets/images/" + moves[moves.length-1].piece + ".png";
@@ -184,24 +183,18 @@ function printMove(){
     getId('moveHistory').scrollTop = getId('moveHistory').scrollHeight; // move scroll bar to show the latest additions (the appends above)
 }
 
-
 function clickEvent() {
 
     let found = 0;      // use as value and boolean
-    let ValidMoves = [];
-    const currentPlayer = getId('board').dataset.player.charAt(0);
     const thisClick = playerAt(this.id);
 
     let squares = document.querySelectorAll(".square");
-    for (let i = 0; i < squares.length; i++) {
-        if (squares[i].classList.contains("clicked")) { found = i + 1; }
-    }
-    // if(!found && currentPlayer==thisClick) {validMoves=validMove(Number(this.id));}
+    for (let i = 0; i < squares.length; i++) 
+        { if (squares[i].classList.contains("clicked"))  found = i + 1; }
 
-    if ((thisClick != currentPlayer))
-        if (!found)     // your first click and not your own piece
-        { return; }
-        else {           // your second click and not your own piece
+    if (thisClick != currentPlayer())
+        if (!found) return;     // your first click and not your own piece
+        else {                  // your second click and not your own piece
             move(found, Number(this.id), squareArr[found]);
             return;
         }
@@ -218,8 +211,8 @@ function move(from, to, piece) {
 
     let valid;
     if (promote.from) {       // skip move validation if we are promoting
-        promote.from = 0;
-        promote.to = 0;
+        // promote.from = 0;
+        // promote.to = 0;
         valid = true;         // promotion piece from penultimate rank could defy validation, eg.. pawn pushes forward and promotes to bishop
     }
     else { valid = validMove(from, to, piece); }  // no promotion, run validation process
@@ -231,6 +224,16 @@ function move(from, to, piece) {
 
     // check from pawn promoting
     if (pieceAt(from) == 'p' && (rank(to) == 8 || rank(to) == 1)) {
+        switch (true) {
+            case file(to) > 5:
+                getId(currentPlayer()+'Promote').style.marginLeft = '288px';
+                break;
+            case file(to) > 3:
+                getId(currentPlayer()+'Promote').style.marginLeft = '144px';
+                break;
+            default:
+                getId(currentPlayer()+'Promote').style.marginLeft = '0';
+        }
         getId(playerAt(from) + 'Promote').style.visibility = 'visible';      // make promotion pieces visible
         const squares = document.querySelectorAll('.square');
         squares.forEach(square => square.classList.add('disabled'));        // provide a disabled look to board during promotion selection
@@ -239,16 +242,24 @@ function move(from, to, piece) {
         return;
     }
 
-    // if(pieceAt(to)=='r' && !castle.hasPieceMoved(to)) castle.recordMove(to);
+    if(promote.from){
+        // const kingAt= squareArr.indexOf(opponent() +'k');
+        // const attackerColour = currentPlayer()
+        valid= validMove(from, to, piece);
+        promote.from = 0;
+        promote.to = 0;     
+        // ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+    }
+
     printSquare(from, "");
     printSquare(to, piece);
+
 
     // passant requires explicit removal of defender, unlike every other attack
     if (getId('board').dataset.player == 'black') {
         if (bPassant.move == moves.length - 1 && bPassant.passant && to== wPassant.where +8 && pieceAt(to)== 'p') {      // is black passant current
             printSquare(bPassant.where, "");
             bPassant.passant = false;
-            // bPassant.where = 0; bPassant.move = 0; bPassant.passant = false;
         }
     }
     // passant requires explicit removal of defender, unlike every other attack
@@ -256,7 +267,6 @@ function move(from, to, piece) {
         if (wPassant.move == moves.length - 1 && wPassant.passant && to== wPassant.where -8 && pieceAt(to)== 'p' ) {      // is white passant current
             printSquare(wPassant.where, "");
             wPassant.passant = false;
-            // wPassant.where = 0; wPassant.move = 0; wPassant.passant = false;
         }
     }
 
@@ -283,8 +293,6 @@ function move(from, to, piece) {
     }
 
     soundAlert('valid');
-    console.log("white Passant", wPassant.move, moves.length-1, );
-
     if(moves.length >20 && !mate){
         isStaleMate(to);
         isDraw();
@@ -293,7 +301,6 @@ function move(from, to, piece) {
     moves.push({ piece: piece, notation: formatFile(file(to)) +rank(to), board: [...squareArr] });     // record moves, especially for passant sake
     printMove();
     getId('moveHistory').dataset.navIndex= moves.length -1;
-
     changePlayer();
     setMousePointer(getId('board').dataset.player);
 }
@@ -309,11 +316,11 @@ function isStaleMate(to){
     if(canMove) return false;
     squares.forEach( ele =>  { if(playerAt(ele.id)== opponent()) pieces.push(Number(ele.id)); });
 
-    if(pieces.length == 1 && !canMove) { gameOver(staleMateMsg, 'staleMate'); }    
-    if(pieces.length >1 && !canMove){
+    if(pieces.length == 1) gameOver(staleMateMsg, 'staleMate');
+    if(pieces.length >1){
         for(const piece of pieces){
             if(pieceAt(piece)== 'k') continue;
-            if(canPieceMove(piece, opponent())) return false;
+            if(canPieceMove(piece, opponent())) return;
         }
         if(pieceAt(to)=='p' && canEnPassant(to, currentPlayer()) ) return;
         gameOver(staleMateMsg, 'staleMate');
@@ -914,42 +921,54 @@ function knightCheck(square, attackerColour) {             // scan hops of the k
 function canPieceMove(from, colour){    // switch piece type- evaluate case for closest square in every direction the piece allows
   
     let path;
+    let  rtnVal= false;
+    
+    changePlayer();
     switch(pieceAt(from)){
-
+  
       case 'p': 
         if(colour =='w') {path= [-7,-8,-9];}
         else {path= [7,8,9];}
         for(const direction of path){
-            // if(validPawn(from, from + Number(direction))) return true;
-            if(validMove(from, from + Number(direction), pieceAt(from))) return true;
+            if(validMove(from, from + Number(direction), squareArr[from])) rtnVal=  true;
+
+            // if(validMove(from, from + Number(direction), pieceAt(from))) rtnVal=  true;
         }
         break;
         
       case 'q':
         path= [-1,1,-7,7,-9,9,-8,8];
         for(const direction of path){
-            if(validQueen(from, from + Number(direction))) return true;
+            if(validMove(from, from + Number(direction), squareArr[from])) rtnVal=  true;
+            
+            // if(validQueen(from, from + Number(direction))) rtnVal=  true;
         }
         break;
       
       case 'b':
         path= [-9,9,-7,7];
         for(const direction of path){
-            if(validBishop(from, from +Number(direction))) return true;
+            if(validMove(from, from +Number(direction), squareArr[from])) rtnVal=  true;
+
+            // if(validBishop(from, from +Number(direction))) rtnVal=  true;
         }
         break;
       
       case 'r':
         path = [-1,1,-8,8];
         for(const direction of path){
-            if(validRook(from, from + Number(direction))) return true;
+            if(validMove(from, from + Number(direction), squareArr[from])) rtnVal=  true;
+
+            // if(validRook(from, from + Number(direction))) rtnVal=  true;
         }
         break;
       
       case 'n':
         path= [-6,6,-10,10,-15,15,-17,17];
         for(const direction of path){
-            if(validKnight(from, from + Number(direction))) return true;
+            if(validMove(from, from + Number(direction), squareArr[from])) rtnVal=  true;
+
+            // if(validKnight(from, from + Number(direction))) rtnVal=  true;
         }
         break;
       
@@ -957,7 +976,8 @@ function canPieceMove(from, colour){    // switch piece type- evaluate case for 
         console.log('testing moves for unknown piece.  Lionel Ritchie');
         break;
     }
-    return false;
+    changePlayer();
+    return rtnVal;
 }
 
 function canEnPassant(square, attackerColour){   // square= pawn checking the King, attackerColour is colour of checking pawn

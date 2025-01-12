@@ -29,10 +29,10 @@ body{ background:#bbb; padding: 20px 40px;}
 }
 
 #moveMessage{
-    margin: 95px 0 15px 0;
+    margin: 95px 1px 0 1px;
     width: 230px;
-    height: 80px;
-    padding: 10px;
+    height: 70px;
+    padding: 0 10px;
     border: solid #555 8px;
     background: #aaa
 }
@@ -63,7 +63,6 @@ body{ background:#bbb; padding: 20px 40px;}
     height: 40px;
 }
 
-
 .moveImg{
     width: 15px;
     height: 15px;
@@ -72,13 +71,15 @@ body{ background:#bbb; padding: 20px 40px;}
 #navContainer{
     display: flex;
     justify-content: space-between;
-    width: 190px;
+    width: 230px;
     background: #bbb;
-    border: solid #555 1px;
+    padding:0 10px;
+    border: solid #555 8px;
+    margin: -5px 1px;
 }
 
 .navButton{
-    width:  40px;
+    width:  50px;
     height: 40px;
 }
 
