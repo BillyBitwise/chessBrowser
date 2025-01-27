@@ -35,16 +35,21 @@ function setWidth(pxls) { r.style.setProperty('--sqWidth', pxls) }       // chan
 function setColumns(c) { r.style.setProperty('--columns', c) }          // changes CSS variable in :root
 function rank(num) { return 9 - (Math.ceil(num / 8)); }
 function file(num) { return num % 8 ? num % 8 : 8; }
-function bgColour(ele, colour) { ele.style = (colour == "white") ? "background:#ddd" : "background:grey"; }
+function bgColour(ele, colour) { ele.style.background = colour; }
+// function bgColour(ele, colour) { ele.style = (colour == "white") ? "background:#ddd" : "background:grey"; }
 
 let currentPlayer = () => getId('board').dataset.player.charAt(0);
 let changePlayer = () => getId('board').dataset.player = currentPlayer() == 'w' ? 'black' : 'white';
 let opponent = () => currentPlayer() == 'w' ? 'b' : 'w';
 let playerAt = (where) => squareArr[where].charAt(0);
 let pieceAt = (where) => squareArr[where].charAt(1);
+let squareAt = (where) => getId(where).dataset.squareColour;
 let mate = false;
 
+const bgWhite= '#ddd';
+const bgBlack='grey';
 const moves = [];
+const gallery = new galleryObj;
 const columns = 8;
 const wPassant = { 'where': 0, 'move': 0, 'passant': false };
 const bPassant = { 'where': 0, 'move': 0, 'passant': false };
@@ -68,6 +73,7 @@ function printBoard(cols) {
     // declare a 'click event' for each square element
     let i = 1;
     let row = 1;
+    let colour;
     const board = getId("board");
 
     board.innerHTML = "";
@@ -77,15 +83,17 @@ function printBoard(cols) {
         square.classList = "square";
         square.id = i;
         if (row % 2) {  // odd ranks start white then black
-            if (i % 2) { bgColour(square, "white"); }
-            else { bgColour(square, "black"); }
+            if (i % 2)  colour= bgWhite;
+            else colour= bgBlack;
         }
         else {       // even ranks start black then white
-            if (i % 2) { bgColour(square, "black"); }
-            else { bgColour(square, "white"); }
+            if (i % 2) colour= bgBlack;
+            else colour= bgWhite;
         }
+        bgColour(square, colour);
+        square.setAttribute('data-square-colour', colour);
 
-        square.addEventListener("click", clickEvent)
+        square.addEventListener("click", clickEvent);
         board.appendChild(square);
 
         if (!(i % cols)) {       // increment row and add break between ranks
@@ -106,7 +114,7 @@ function printBoard(cols) {
 function printPromote(colour) {
 
     const promote = ['n', 'b', 'r', 'q'];                // add colour parameter to each element makes a valid piece
-    const bg = colour == 'w' ? 'black' : 'white';
+    const bg = colour == 'w' ? bgBlack : bgWhite;
     const parent = colour == 'w' ? 'wPromote' : 'bPromote';  // ids for divs above and below the board
 
     for (let i = 0; i < promote.length; i++) {
@@ -210,12 +218,8 @@ function clickEvent() {
 function move(from, to, piece) {
 
     let valid;
-    if (promote.from) {       // skip move validation if we are promoting
-        // promote.from = 0;
-        // promote.to = 0;
-        valid = true;         // promotion piece from penultimate rank could defy validation, eg.. pawn pushes forward and promotes to bishop
-    }
-    else { valid = validMove(from, to, piece); }  // no promotion, run validation process
+    if (promote.from) valid= true;              // skip move validation if we are promoting    
+    else valid = validMove(from, to, piece);    // no promotion, run validation process
 
     if (!valid) {
         soundAlert('invalid');
@@ -243,21 +247,21 @@ function move(from, to, piece) {
     }
 
     if(promote.from){
-        // const kingAt= squareArr.indexOf(opponent() +'k');
-        // const attackerColour = currentPlayer()
         valid= validMove(from, to, piece);
         promote.from = 0;
         promote.to = 0;     
-        // ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????
     }
 
+    if(squareArr[to]) gallery.add(squareArr[to]);  // if to is not empty, it's a take, add to gallery
+    
+    // if(squareArr[to]) printGallery(squareArr[to]);  // if to is not empty, it's a take, add to gallery
+    console.log(gallery);
     printSquare(from, "");
     printSquare(to, piece);
-
-
     // passant requires explicit removal of defender, unlike every other attack
     if (getId('board').dataset.player == 'black') {
         if (bPassant.move == moves.length - 1 && bPassant.passant && to== wPassant.where +8 && pieceAt(to)== 'p') {      // is black passant current
+            gallery.add(squareArr[bPassant.where]);
             printSquare(bPassant.where, "");
             bPassant.passant = false;
         }
@@ -265,6 +269,7 @@ function move(from, to, piece) {
     // passant requires explicit removal of defender, unlike every other attack
     if (getId('board').dataset.player == 'white') {
         if (wPassant.move == moves.length - 1 && wPassant.passant && to== wPassant.where -8 && pieceAt(to)== 'p' ) {      // is white passant current
+            gallery.add(squareArr[wPassant.where]);
             printSquare(wPassant.where, "");
             wPassant.passant = false;
         }
@@ -301,6 +306,17 @@ function move(from, to, piece) {
     moves.push({ piece: piece, notation: formatFile(file(to)) +rank(to), board: [...squareArr] });     // record moves, especially for passant sake
     printMove();
     getId('moveHistory').dataset.navIndex= moves.length -1;
+    
+    console.log(moves.length);
+    let previous;
+    if(moves.length ==2) getId('moveHistory').setAttribute('data-previous', to);
+    else{
+        previous = getId('moveHistory').dataset.previous;
+        bgColour(getId(previous), getId(previous).dataset.squareColour);
+        // getId(previous).style.background= getId(previous).dataset.squareColour;
+        getId('moveHistory').dataset.previous=to;
+    } 
+    if(!mate) getId(to).style.background='papayawhip';
     changePlayer();
     setMousePointer(getId('board').dataset.player);
 }
@@ -814,7 +830,10 @@ function isInCheck(square, attackerColour) {
                         }
                     }
                 }
-                if(!canBlock) gameOver(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `, 'checkMate');
+                if(!canBlock) {
+                    gameOver(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `, 'checkMate');
+                    mate=true;
+                }
             }                
         }
     }
@@ -839,7 +858,10 @@ function canKingMove(square, dire){     // square= location of King under check,
     }
 
     changePlayer();
-    if(!canMove && dire){ gameOver(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `, 'checkMate');}     // If King must move but can not... GAME OVER  
+    if(!canMove && dire){
+         gameOver(`Congratulations ${formatColour(currentPlayer())}. That's a cZechMate `, 'checkMate');
+         mate=true;
+        }     // If King must move but can not... GAME OVER  
     return canMove;                         // assumed King can not move, unless King has at least one safe square to move to
 }
 
@@ -1093,6 +1115,101 @@ Array.prototype.hasEqualElements = function (arr) {
     if (equalElements.length) return equalElements;  //BUG no IF, just return
 }
 
+function galleryObj(){
+  
+    this.gallery =[];
+    this.dump= () => {for( let item of this.gallery) console.log(item);}                  
+    this.count= (piece) => { return this.gallery.filter( (item) => item== piece).length; };
+    
+    this.typeOrder= (type) => {
+        const ord={
+            'p':0,
+            'n':1,
+            'b':2,
+            'r':3,
+            'q':4
+        };
+        return ord[type] || '';
+    } 
+    
+    this.typeValue= (type) => {
+        const value={
+            'p':1,
+            'n':3,
+            'b':3,
+            'r':5,
+            'q':9
+        };
+        return value[type] || '';
+    }
+                
+    this.appendCalculator= () =>{
+        if(!this.gallery.length){
+            const wCountDiv= document.createElement('div');
+            wCountDiv.id='wCount';
+            wCountDiv.style.order=5;
+            const bCountDiv= document.createElement('div');
+            bCountDiv.id='bCount';
+            bCountDiv.style.order=5;
+            document.querySelector('#wGallery').appendChild(wCountDiv);
+            document.querySelector('#bGallery').appendChild(bCountDiv);
+        }    
+    }
+
+    this.pointsCalculator= () => {
+        let wCount=0;
+        let bCount=0;
+        for(let piece of this.gallery){
+            if(piece.charAt(0)== 'w'){
+                wCount+= this.typeValue(piece.charAt(1)); 
+                console.log(`White - ${this.typeValue(piece.charAt(1))}`);
+            }
+            else{
+                bCount+= this.typeValue(piece.charAt(1));
+                console.log(`Black - ${this.typeValue(piece.charAt(1))}`);            
+            }     
+        }    
+        document.querySelector('#wCount').textContent= wCount> bCount? `+${wCount-bCount}`: '';
+        document.querySelector('#bCount').textContent= bCount> wCount? `+${bCount-wCount}`: '';    
+        document.querySelector('#wCount').style.visibility= wCount> bCount? 'visible': 'hidden';
+        document.querySelector('#bCount').style.visibility= bCount> wCount? 'visible': 'hidden';    
+    }  
+    
+    this.add= (piece) => {
+  
+        this.gallery.push(piece);
+        const pieceExists= document.querySelector(`.${piece}`);
+        if(pieceExists) {
+            pieceExists.textContent= Number(pieceExists.textContent) +1;
+            pieceExists.style.visibility= 'visible';
+            this.pointsCalculator();
+            return;
+        }
+
+        const colour= piece.charAt(0);
+        const filter= `#${colour}Gallery`;
+        const playerGallery= document.querySelector(filter);
+    
+        const pieceImg= document.createElement("img");
+        const pieceQty= document.createElement("div");    
+        const container= document.createElement('div');
+    
+        container.classList= 'galleryLine';
+        container.style.order= this.typeOrder(piece.charAt(1));
+        pieceImg.src= `assets/images/${piece}.png`;
+        pieceQty.textContent= this.count(piece);
+        pieceQty.style.visibility='hidden';
+        pieceQty.classList= `${piece}`;
+    
+        container.appendChild(pieceImg);
+        container.appendChild(pieceQty);
+        playerGallery.appendChild(container);
+        this.pointsCalculator();
+    };
+    this.appendCalculator();
+}
+  
+
 // ************ Executable Code **************** //
 // ********************************************* //
 
@@ -1103,3 +1220,4 @@ printBoard(columns);
 
 // both validKnight() and validKing() can return nothing and leave an undefined value for rtnVal in validMove()
 // WHAT ABOUT PROMOTION SIMULATION ?????????????
+// bgColour should accept the actual colours white- '#ddd',  black- 'grey'

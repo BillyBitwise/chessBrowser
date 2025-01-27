@@ -13,12 +13,58 @@
 
 *{ margin: var(--marg); }
 
-body{ background:#bbb; padding: 20px 40px;}
+body{
+    background:#bbb;
+    padding: 20px 40px;
+}
 
 #container{
     display: flex;
     align-items: flex-start;
-    gap: 20px;
+    gap: 10px;
+}
+#gallery{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 95px 10px 0 10px;
+    padding: 5px;
+    border: solid #555 8px;
+    background: #aaa;
+    width: 80px;
+    height: 550px;
+}
+
+#gallery >div{
+    display: flex;
+    flex-direction: column-reverse;
+    flex-wrap: nowrap;
+    flex: 1 0 45%;
+    border: solid #555 1px;
+}
+
+.galleryLine >*{
+    flex: 0 0 45%;
+    width: 35px;
+    height: 40px;
+}
+
+.galleryLine{
+    display: flex;
+    gap: 10px;
+}
+
+#wCount,
+#bCount{
+    align-self: flex-end;
+    margin: 10px 5px auto 0;
+    padding-left:10px;
+    width: 30px;
+    color: darkblue;
+    background: #ccc;
+    border-radius: 8px;
+    border: solid grey 2px;
+    visibility: hidden;
 }
 
 #board{
@@ -32,9 +78,9 @@ body{ background:#bbb; padding: 20px 40px;}
     margin: 95px 1px 0 1px;
     width: 230px;
     height: 70px;
-    padding: 0 10px;
+    padding: 5px 10px;
     border: solid #555 8px;
-    background: #aaa
+    background: #aaa;
 }
 
 #moveHistory{
