@@ -27,7 +27,7 @@ let squareArr = [true,
     'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
     'wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr' ];    
 let newBoard= [...squareArr];   //not used
-squareArr[0]=[...squareArr];
+squareArr[0]= [...squareArr];
 
 function Lionel() { console.log("Hello! Is it me you're looking for?"); }
 function getId(ele) { return document.getElementById(ele); }
@@ -96,7 +96,7 @@ function printBoard(cols) {
         square.addEventListener("click", clickEvent);
         board.appendChild(square);
 
-        if (!(i % cols)) {       // increment row and add break between ranks
+        if (!(i % cols) && i != cols ** 2) {       // increment row and add break between ranks
             row++;
             board.appendChild(document.createElement("br"));
         }
@@ -106,6 +106,10 @@ function printBoard(cols) {
     for (let i = 1; i <= squareArr.length - 1; i++)  printSquare(i, squareArr[i]); 
     printPromote('w');
     printPromote('b');
+    document.querySelector('#flip').classList.add('enable');
+    document.querySelector('#flip').addEventListener('click', () => {
+        Array.from(board.children).reverse().forEach( (sqr) =>{ board.appendChild(sqr) });
+    });
     setMousePointer(getId("board").dataset.player);
     moves.push({piece:'', notation:'', board: [...squareArr]});
 }
@@ -198,7 +202,9 @@ function clickEvent() {
 
     let squares = document.querySelectorAll(".square");
     for (let i = 0; i < squares.length; i++) 
-        { if (squares[i].classList.contains("clicked"))  found = i + 1; }
+        { if (squares[i].classList.contains("clicked"))  found = Number(squares[i].id); }  //  found = Number(squares[i].id) +1
+
+        // { if (squares[i].classList.contains("clicked"))  found = i + 1; }  //  found = Number(squares[i].id) +1
 
     if (thisClick != currentPlayer())
         if (!found) return;     // your first click and not your own piece
@@ -254,8 +260,6 @@ function move(from, to, piece) {
 
     if(squareArr[to]) gallery.add(squareArr[to]);  // if to is not empty, it's a take, add to gallery
     
-    // if(squareArr[to]) printGallery(squareArr[to]);  // if to is not empty, it's a take, add to gallery
-    console.log(gallery);
     printSquare(from, "");
     printSquare(to, piece);
     // passant requires explicit removal of defender, unlike every other attack
@@ -316,7 +320,12 @@ function move(from, to, piece) {
         // getId(previous).style.background= getId(previous).dataset.squareColour;
         getId('moveHistory').dataset.previous=to;
     } 
-    if(!mate) getId(to).style.background='papayawhip';
+
+    if(!mate){
+        if(getId(to).dataset.squareColour== bgWhite)  getId(to).style.background='papayawhip';
+        else{ getId(to).style.background= 'color-mix(in oklab, grey 60%, yellow)';}
+    }
+
     changePlayer();
     setMousePointer(getId('board').dataset.player);
 }
@@ -1050,6 +1059,7 @@ function gameOver(msg, sound){
     getId('moveMessage').textContent= msg;
     console.log(msg);
 
+    navs.forEach( (button) => {button.classList.add('enable')});
     navs.forEach(nav => {   // each navigator button assigned event handler and cursor pointers
         nav.addEventListener('mouseenter', () => nav.style.cursor='pointer');
         nav.addEventListener('mouseleave', () => nav.style.cursor='pointer');
@@ -1118,7 +1128,7 @@ Array.prototype.hasEqualElements = function (arr) {
 function galleryObj(){
   
     this.gallery =[];
-    this.dump= () => {for( let item of this.gallery) console.log(item);}                  
+    // this.dump= () => {for( let item of this.gallery) console.log(item);}                  
     this.count= (piece) => { return this.gallery.filter( (item) => item== piece).length; };
     
     this.typeOrder= (type) => {
